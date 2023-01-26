@@ -1,0 +1,609 @@
+<apex:page controller="NMTMetadataController" sidebar="false" title="Update Page Layouts" id="metadata" >	
+    <html xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+        <apex:includeScript value="{!URLFOR($Resource.NMTjs, 'js/jquery_3_1_1.min.js')}"/>
+        <apex:slds />
+        <style>
+            .tableStyle{
+            border-collapse: separate !important;
+            }
+        </style>
+        <script>
+        j$ = jQuery.noConflict();
+        j$( document ).ready(function() {
+            enableDisableButton();
+        });
+        
+        
+        function supportIcons() {
+            
+            j$('#metadata\\:form\\:metadataLayoutTable tr').each(function(index) {
+                var objectCheckbox = document.getElementById('metadata:form:metadataLayoutTable:'+index+':objectCheckbox');                  
+                var disabled = j$('#metadata\\:form\\:metadataLayoutTable\\:'+index+'\\:objectCheckbox').is(":disabled");
+                if(objectCheckbox){
+                    if(!disabled){
+                        var notesRL = j$('#metadata\\:form\\:metadataLayoutTable\\:'+index+'\\:notesRL').html();
+                        var filesRL = j$('#metadata\\:form\\:metadataLayoutTable\\:'+index+'\\:filesRL').html();
+                        if(notesRL =="false"){
+                            j$('#metadata\\:form\\:metadataLayoutTable\\:'+index+'\\:notesRLIcon').replaceWith( "<td class='tableStyle slds-table slds-table--bordered slds-table--cell-buffer'></td>");
+                        } 
+                        if(filesRL == "false"){
+                            j$('#metadata\\:form\\:metadataLayoutTable\\:'+index+'\\:filesRLIcon').replaceWith( "<td class='tableStyle slds-table slds-table--bordered slds-table--cell-buffer'></td>"); 
+                        } 
+                        
+                    } else {
+                        j$('#metadata\\:form\\:metadataLayoutTable\\:'+index+'\\:notesRLIcon').replaceWith( "<td class='tableStyle slds-table slds-table--bordered slds-table--cell-buffer'></td>");
+                        j$('#metadata\\:form\\:metadataLayoutTable\\:'+index+'\\:filesRLIcon').replaceWith( "<td class='tableStyle slds-table slds-table--bordered slds-table--cell-buffer'></td>");
+                        
+                    }
+                    
+                    j$('#metadata\\:form\\:metadataLayoutTable\\:'+index+'\\:filesRLIcon').show();
+                    j$('#metadata\\:form\\:metadataLayoutTable\\:'+index+'\\:notesRLIcon').show();
+                } 
+            });
+        }
+        
+        function refresh(){
+            enableDisableButton();
+            j$('#promptMetadataRemove').hide();
+            j$('#promptMetadataAdd').hide();
+            j$('#promptMetadataAddFile').hide();
+            j$('#modalMetadataAddFile').hide();
+            j$('#modalMetadataAdd').hide();
+            j$('#modalMetadataRemove').hide();
+            document.getElementById("retry").style.display = "none";
+            document.getElementById("table").style.display = "inline";
+            document.getElementById("finished").style.display = "none";
+            document.getElementById("refreshButton").style.display = "none";
+        }
+        
+        function addMetadataRemote(relatedList){
+            document.getElementById('processing').innerHTML = "Modifying page layout(s)...";
+            document.getElementById("retry").style.display = "inline";
+            document.getElementById("table").style.display = "none";
+            var objectNames = "";
+            var relatedList = relatedList;
+            j$('#metadata\\:form\\:metadataLayoutTable tr').each(function(index) {
+                var layout = document.getElementById('metadata:form:metadataLayoutTable:'+index+':objectCheckbox');
+                var checked = j$('#metadata\\:form\\:metadataLayoutTable\\:'+index+'\\:objectCheckbox').is(":checked");
+                var isDisable = j$('#metadata\\:form\\:metadataLayoutTable\\:'+index+'\\:objectCheckbox').is(":disabled");
+                if(checked && !isDisable && relatedList){                    
+                    var objectFullName = j$('#metadata\\:form\\:metadataLayoutTable\\:'+index+'\\:fullName').html();
+                    objectNames+=objectFullName+',';
+                }
+                if(layout){
+                    layout.checked = false;
+                }
+            });
+            var allLayoutsSelected = document.getElementById('metadata:form:metadataLayoutTable:selectUnselectAllLayoutsCheckbox');
+            allLayoutsSelected.checked = false;
+            closeMetadataAddModal();
+            Visualforce.remoting.Manager.invokeAction(
+                '{!$RemoteAction.NMTMetadataController.addMetadataRemote}',
+                objectNames, relatedList,
+                function(result, event){
+                    if (event.status) {
+                        setTimeout(function(){ 
+                            
+                            document.getElementById("finished").style.display = "inline";
+                            document.getElementById('processing').innerHTML = 'The ' + relatedList + " related list was added to the selected page layouts. Refresh your browser to modify more layouts.";
+                            document.getElementById("refreshButton").style.display = "inline";
+                            
+                            
+                        }, 5000);
+                        
+                        
+                    } else if (event.type === 'exception') {
+                        
+                        
+                        console.error('Error running the metadata modification, exception: '+event.where + ' Msg: ' + event.message);
+                        document.getElementById("refreshButton").style.display = "inline";
+                    } else {
+                        
+                        
+                        
+                        console.error('Error running the metadata modification, message: '+event.where + ' Msg: ' + event.message);
+                        document.getElementById("refreshButton").style.display = "inline";
+                    }
+                    
+                }, 
+                {escape: true}
+            );
+        }
+        
+        function removeMetadataRemote(relatedList){
+            document.getElementById('processing').innerHTML = "Modifying page layout(s)...";
+            document.getElementById("retry").style.display = "inline";
+            document.getElementById("table").style.display = "none";
+            var objectNames = "";
+            var relatedList = relatedList;
+            j$('#metadata\\:form\\:metadataLayoutTable tr').each(function(index) {
+                var layout = document.getElementById('metadata:form:metadataLayoutTable:'+index+':objectCheckbox');
+                var checked = j$('#metadata\\:form\\:metadataLayoutTable\\:'+index+'\\:objectCheckbox').is(":checked");
+                var isDisable = j$('#metadata\\:form\\:metadataLayoutTable\\:'+index+'\\:objectCheckbox').is(":disabled");
+                if(checked && !isDisable && relatedList){                    
+                    var objectFullName = j$('#metadata\\:form\\:metadataLayoutTable\\:'+index+'\\:fullName').html();
+                    objectNames+=objectFullName+',';
+                }
+                if(layout){
+                    layout.checked = false;
+                }
+            });  
+            var allLayoutsSelected = document.getElementById('metadata:form:metadataLayoutTable:selectUnselectAllLayoutsCheckbox');
+            allLayoutsSelected.checked = false;
+            Visualforce.remoting.Manager.invokeAction(
+                '{!$RemoteAction.NMTMetadataController.removeMetadataRemote}',
+                objectNames, relatedList, 
+                function(result, event){
+                    
+                    if (event.status) {
+                        setTimeout(function(){ 
+                            
+                            document.getElementById("finished").style.display = "inline";
+                            document.getElementById('processing').innerHTML = "The Notes & Attachments related list was removed from the selected page layouts. Refresh your browser to modify more layouts.";
+                            document.getElementById("refreshButton").style.display = "inline";
+                            
+                            
+                        }, 5000);
+                    } else if (event.type === 'exception') { 
+                        
+                        
+                        console.error('Error running the metadata modification, exception: '+event.where + ' Msg: ' + event.message);
+                        document.getElementById("refreshButton").style.display = "inline";
+                    } else {
+                        
+                        
+                        console.error('Error running the metadata modification, message: '+event.where + ' Msg: ' + event.message);
+                        document.getElementById("refreshButton").style.display = "inline";
+                    }
+                }, 
+                {escape: true}
+            );
+        } 
+        
+        function metadataRemovePrompt(){
+            j$('#promptMetadataRemove').show();
+            j$( "#modalMetadataRemove" ).toggleClass( "slds-backdrop--close" );
+            j$( "#modalMetadataRemove" ).toggleClass( "slds-backdrop--open" );
+        }
+        
+        function metadataAddPrompt(){
+            j$('#promptMetadataAdd').show();
+            j$( "#modalMetadataAdd" ).toggleClass( "slds-backdrop--close" );
+            j$( "#modalMetadataAdd" ).toggleClass( "slds-backdrop--open" );
+        }
+        
+        function metadataAddFilePrompt(){
+            j$('#promptMetadataAddFile').show();
+            j$( "#modalMetadataAddFile" ).toggleClass( "slds-backdrop--close" );
+            j$( "#modalMetadataAddFile" ).toggleClass( "slds-backdrop--open" );
+        }
+        
+        function closeMetadataRemoveModal(){
+            j$('#promptMetadataRemove').hide();
+            j$( "#modalMetadataRemove" ).toggleClass( "slds-backdrop--close" );
+            j$( "#modalMetadataRemove" ).toggleClass( "slds-backdrop--open" );
+        }
+        function closeMetadataAddModal(){
+            j$('#promptMetadataAdd').hide();
+            j$( "#modalMetadataAdd" ).toggleClass( "slds-backdrop--close" );
+            j$( "#modalMetadataAdd" ).toggleClass( "slds-backdrop--open" );
+        }
+        
+        function closeMetadataAddFileModal(){
+            j$('#promptMetadataAddFile').hide();
+            j$( "#modalMetadataAddFile" ).toggleClass( "slds-backdrop--close" );
+            j$( "#modalMetadataAddFile" ).toggleClass( "slds-backdrop--open" );
+        }
+        
+        function selectUnselectAllLayouts(){
+            var allLayoutsSelected = document.getElementById('metadata:form:metadataLayoutTable:selectUnselectAllLayoutsCheckbox').checked;
+            j$('#metadata\\:form\\:metadataLayoutTable tr').each(function(index) {
+                var objectCheckbox = document.getElementById('metadata:form:metadataLayoutTable:'+index+':objectCheckbox');
+                var disabled = j$('#metadata\\:form\\:metadataLayoutTable\\:'+index+'\\:objectCheckbox').is(":disabled");
+                if(objectCheckbox && !disabled){
+                    objectCheckbox.checked = allLayoutsSelected; 
+                }
+            });
+            enableDisableButton();
+            
+        }
+        
+        function enableDisableButton(){   
+            var enableAddButton = false;
+            var enableAddFileButton = false;
+            var enableRemoveButton = false;
+            var allCheckbox = true;
+            j$('#metadata\\:form\\:metadataLayoutTable tr').each(function(index) {
+                var objectCheckbox = document.getElementById('metadata:form:metadataLayoutTable:'+index+':objectCheckbox');
+                var checked = j$('#metadata\\:form\\:metadataLayoutTable\\:'+index+'\\:objectCheckbox').is(":checked");                     
+                var disabled = j$('#metadata\\:form\\:metadataLayoutTable\\:'+index+'\\:objectCheckbox').is(":disabled");
+                if(objectCheckbox){
+                    
+                    if(checked && !disabled){
+                        enableAddButton = true;
+                        enableAddFileButton = true;
+                        enableRemoveButton = true;
+                    } else{
+                        if(!disabled){
+                            allCheckbox = false;
+                        }
+                    }
+                } 
+            });
+            
+            document.getElementById('addButton').disabled = !enableAddButton;
+            document.getElementById('addFileButton').disabled = !enableAddFileButton;
+            document.getElementById('removeButton').disabled = !enableRemoveButton;
+            document.getElementById('metadata:form:metadataLayoutTable:selectUnselectAllLayoutsCheckbox').checked = allCheckbox; 
+            supportIcons();
+            
+            var showNotes = document.getElementById('metadata:form:metadataLayoutTable:notesRLIconheader');
+            if(showNotes==null){
+                j$('[id$=addButton]').hide();
+            }            
+        }
+        
+        //To create the remote setting
+        function createRemoteSite()
+        {
+            // Disable button
+            document.getElementById('createremotesitebtn').disabled = true;
+            // Calls the Metdata API from JavaScript to create the Remote Site Setting to permit Apex callouts
+            var binding = new XMLHttpRequest();
+            var request =
+                '<?xml version="1.0" encoding="utf-8"?>' +
+                '<env:Envelope xmlns:env="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'+
+                '<env:Header>' +
+                '<urn:SessionHeader xmlns:urn="http://soap.sforce.com/2006/04/metadata">' +
+                '<urn:sessionId>{!$Api.Session_ID}</urn:sessionId>' +
+                '</urn:SessionHeader>' +
+                '</env:Header>' +
+                '<env:Body>' +
+                '<upsertMetadata xmlns="http://soap.sforce.com/2006/04/metadata">' +
+                '<metadata xsi:type="RemoteSiteSetting">' +
+                '<fullName>NAMUpdatePageLayout</fullName>' +
+                '<description>Remote Setting to Update Page Layouts</description>' +
+                '<disableProtocolSecurity>false</disableProtocolSecurity>' +
+                '<isActive>true</isActive>' +
+                '<url>{!Host}</url>' +
+                '</metadata>' +
+                '</upsertMetadata>' +
+                '</env:Body>' +
+                '</env:Envelope>';
+            binding.open('POST', '{!Host}/services/Soap/m/41.0');
+            binding.setRequestHeader('SOAPAction','""');
+            binding.setRequestHeader('Content-Type', 'text/xml');
+            binding.onreadystatechange =
+                function() {
+                if(this.readyState==4) {
+                    var parser = new DOMParser();
+                    var doc  = parser.parseFromString(this.response, 'application/xml');
+                    var errors = doc.getElementsByTagName('errors');
+                    var messageText = '';
+                    for(var errorIdx = 0; errorIdx < errors.length; errorIdx++)
+                        messageText+= errors.item(errorIdx).getElementsByTagName('message').item(0).innerHTML + '\n';
+                    //displayMetadataResponse(messageText);
+                    window.location.reload();
+                }
+            }
+            binding.send(request);
+        }
+        
+        </script>
+        
+        <div class="altimetrik">
+            <apex:form id="form">
+                <apex:pageMessages id="messages"/>
+                <div class="slds-m-top--small" id="migration">
+                    <!-- Warning bubble -->
+                    <div class="{!showHideRemote} slds-grid">
+                        <div class="slds-size--1-of-1">                        
+                            <div class="slds-card slds-m-horizontal--small ">
+                                <div class="slds-m-top--x-small slds-clearfix" style="margin-top: 1%; margin-bottom: 1%;">
+                                    <div id="processingRemoteSetting" class="slds-m-bottom-x-small slds-m-top--x-small slds-m-left--small slds-float--left" style="width: 60%">                                
+                                        The Update Page Layouts tool uses the Metadata API to modify your organization’s metadata.  
+                                        As a result, the tool must be whitelisted as a remote site. 
+                                        Also verify <a href="https://help.salesforce.com/articleView?id=000003652&type=1" target = "_blank">IP restrictions</a> and upper case in url.
+                                        <div class="slds-m-top_small"> 
+                                            
+                                            <div class="slds-text-longform slds-text-color_weak slds-box">
+                                                <div class="slds-m-bottom_small">
+                                                    <strong>Debug logs:</strong>
+                                                </div>
+                                                {!RemoteSettingConnectionWarningMessage}
+                                            </div>
+                                            
+                                        </div>
+                                    </div> 
+                                    <div  class="slds-float--right " >
+                                        <div>
+                                            <button id="createremotesitebtn" 
+                                                    class="slds-float--left slds-button slds-button--brand  slds-m-right--small slds-m-bottom--x-small" 
+                                                    type="button"
+                                                    onclick="createRemoteSite();" >Create Remote Site Setting</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+        <!--IF NO REMOTE SETTING ON PE -->
+        <!-- Warning bubble -->
+        <div class="{!showHideNoSupported} slds-grid">
+            <div class="slds-size--2-of-2">                        
+                <div class="slds-card slds-m-horizontal--small ">
+                    <div class="slds-m-top--x-small slds-clearfix" style="margin-top: 1%; margin-bottom: 1%;">
+                        <div id="processingRemoteSettingPE" class="slds-m-bottom-x-small slds-m-top--x-small slds-m-left--small slds-float--left" style="width: 60%">                                
+                            <p>
+                               The Update Page Layouts tool uses the Metadata API to modify your organization’s metadata.  
+                                        As a result, the tool must be whitelisted as a remote site. 
+                                        Also verify <a href="https://help.salesforce.com/articleView?id=000003652&type=1" target = "_blank">IP restrictions</a> and upper case in url.
+                                         
+                            </p>  
+                            <p>
+                            You are in a {!orgEdition} and need to create the Remote Site manually.<br/><br/>
+                                        {!RemoteSettingConnectionWarningMessage}<br/>
+                                
+                            </p>
+                                       
+                        </div> 
+                    </div>
+                </div>
+            </div>
+        </div>
+                    
+                    <div>
+                        <div id="retry" style="display: none;" >
+                                <div class="slds-size--1-of-2">                        
+                                    <div class="slds-card slds-m-horizontal--small ">
+                                        <div class="slds-m-top--x-small slds-clearfix" style="margin-top: 1%; margin-bottom: 1%;">
+                                            
+                                            <!-- Warning bubble -->
+                                            <div id="finished" style="display: none;" class="slds-m-bottom-x-small slds-m-left--medium slds-float--left">
+                                                <span class="slds-icon_container slds-icon-standard-task2"
+                                                      style="padding: 5px; margin-top: 2px;">
+                                                    <span class="slds-icon slds-icon_x-small" 
+                                                          aria-hidden="true">
+                                                        <img src="{!URLFOR($Asset.SLDS, 'assets/icons/action/approval_60.png')}"  
+                                                             class="slds-icon_x-small"/>
+                                                    </span>
+                                                    
+                                                </span>
+                                            </div>
+                                            <!-- Warning bubble -->
+                                            <div id="processing" class="slds-m-bottom-x-small slds-m-top--x-small slds-m-left--x-small slds-float--left" style="width: 60%">                                
+                                            </div>
+                                            <div class="slds-float--right">
+                                                <div id="refreshButton" style="display: none;" >
+                                                    <apex:commandButton value="Refresh" action="{!Refresh}"
+                                                                        oncomplete="refresh()"
+                                                                        rerender="metadataPanel"
+                                                                        styleClass="slds-float--left slds-button slds-button--neutral  slds-m-right--small slds-m-bottom--x-small"
+                                                                        />
+                                                    
+                                                </div>
+                                            </div>
+                                            
+                                            
+                                        </div>
+                                    </div>
+                                    
+                                </div>
+                        </div>
+                        <div class="{!showHide}" id="table" >
+                                <div class="slds-size--1-of-1">                        
+                                    <div class="slds-card slds-m-horizontal--small ">
+                                        <!-- START confirm Remove metadata dialog -->
+                                        <div role="alertdialog" tabindex="-1" aria-labelledby="prompt-heading-id" 
+                                             aria-describedby="prompt-message-wrapper" class="slds-modal slds-fade-in-open slds-modal--prompt slds-hide" id="promptMetadataRemove">
+                                            <div class="slds-modal__container">
+                                                <div class="slds-modal__header slds-theme--info slds-theme--alert-texture">
+                                                    <h2 class="slds-text-heading--medium" id="prompt-heading-id">Remove Notes &amp; Attachments related list?</h2>                                        
+                                                </div>
+                                                <div class="slds-modal__content slds-p-around--medium">              
+                                                    <p>
+                                                        You're removing the Notes  &amp; Attachments related list from all page layouts. 
+                                                        Be sure you have converted all your attachments and Classic notes before removing this related list
+                                                    </p>
+                                                    <p style="{!isPendingNotes}"><br/>Some Classic notes haven’t been converted. If you remove this related list, you won’t be able to see these notes.</p>
+                                                    <br/>
+                                                    <p style="{!isPendingFiles}"><br/>Some attachments haven’t been converted. If you remove this related list, you won’t be able to see these attachments.</p>
+                                                </div>
+                                                <div class="slds-modal__footer slds-theme--default">
+                                                    <a href="#" class="slds-button slds-button--neutral  slds-m-right--small slds-m-bottom--x-small" onClick="closeMetadataRemoveModal()">Cancel</a>
+                                                    <a href="#" onClick="removeMetadataRemote('NotesAttachments')" id="metadataAddFileButton" class="slds-button slds-button--neutral slds-m-right--small slds-m-bottom--x-small">Remove</a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="slds-backdrop slds-backdrop--close" id="modalMetadataRemove"></div>  
+                                        <!-- END confirm Remove metadata dialog -->
+                                        
+                                        <!-- START confirm Add Files metadata dialog -->
+                                        <div role="alertdialog" tabindex="-1" aria-labelledby="prompt-heading-id" 
+                                             aria-describedby="prompt-message-wrapper" class="slds-modal slds-fade-in-open slds-modal--prompt slds-hide" id="promptMetadataAddFile">
+                                            <div class="slds-modal__container">
+                                                <div class="slds-modal__header slds-theme--info slds-theme--alert-texture">
+                                                    <h2 class="slds-text-heading--medium" id="prompt-heading-id">Add Files related list?</h2>                                        
+                                                </div>
+                                                <div class="slds-modal__content slds-p-around--medium">              
+                                                    <p>You're adding the new Files related list to page layouts you've selected.</p>
+                                                </div>
+                                                <div class="slds-modal__footer slds-theme--default">
+                                                    <a href="#" class="slds-button slds-button--neutral  slds-m-right--small slds-m-bottom--x-small" onClick="closeMetadataAddFileModal()">Cancel</a>
+                                                    <a href="#" onClick="addMetadataRemote('Files')" id="metadataAddFileButton" class="slds-button slds-button--neutral slds-m-right--small slds-m-bottom--x-small">Add</a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="slds-backdrop slds-backdrop--close" id="modalMetadataAddFile"></div>  
+                                        <!-- END confirm Add Files metadata dialog -->
+                                        
+                                        <!-- START confirm Add Notes metadata dialog -->
+                                        <div role="alertdialog" tabindex="-1" aria-labelledby="prompt-heading-id" 
+                                             aria-describedby="prompt-message-wrapper" class="slds-modal slds-fade-in-open slds-modal--prompt slds-hide" id="promptMetadataAdd">
+                                            <div class="slds-modal__container">
+                                                <div class="slds-modal__header slds-theme--info slds-theme--alert-texture">
+                                                    <h2 class="slds-text-heading--medium" id="prompt-heading-id">Add Notes related list?</h2>                                        
+                                                </div>
+                                                <div class="slds-modal__content slds-p-around--medium">              
+                                                    <p>You're adding the Notes related list to page layouts you've selected.</p>
+                                                </div>
+                                                <div class="slds-modal__footer slds-theme--default">
+                                                    <a href="#" class="slds-button slds-button--neutral  slds-m-right--small slds-m-bottom--x-small" onClick="closeMetadataAddModal()">Cancel</a>
+                                                    <a href="#" onClick="addMetadataRemote('Notes')" id="metadataAddButton" class="slds-button slds-button--neutral slds-m-right--small slds-m-bottom--x-small">Add</a>
+                                                    
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="slds-backdrop slds-backdrop--close" id="modalMetadataAdd"></div>  
+                                        <!-- END confirm Add Notes metadata dialog -->
+                                        
+                                        <div class="slds-m-top--x-small slds-clearfix" style="margin-top: 1%; margin-bottom: 1%;">
+                                            <div class="slds-float--left slds-text-heading--small slds-m-top--xxx-small 
+                                                        slds-m-left--large slds-p-left--small" style="width: 50%">
+                                                Modify Page Layouts
+                                                <div class="mouseOverInfoOuter" id="searchInvoiceHelper" onfocus="addMouseOver(this)" onmouseover="addMouseOver(this)" tabindex="0">
+                                                    <img src="/s.gif" alt="" class="infoIcon" title="" />
+                                                    <div class="mouseOverInfo" id="searchInvoiceHelperText" style="display: none; opacity: -0.19999999999999996; left: 1px;">
+                                                        <div class="slds-popover__body" style="font-size:13px">
+                                                            <ul class="slds-list--dotted">
+                                                                <li><b>Add Files related list</b> adds Files to page layouts that already have the Notes &amp; Attachments related list.</li>
+                                                                <li><b>Add Notes related list</b> adds Notes to page layouts that already have the Notes &amp; Attachments related list.</li>
+                                                                <li><b>Remove Notes &amp; Attachments related list.</b> Once you are confident that your Files and Notes conversions have happened and you've added the new Files and Notes related lists, you can remove the Notes &amp; Attachment related list from your page layouts. This doesn't delete Classic notes or files, but it cleans up your page layouts. </li>
+                                                            </ul> 
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="slds-float--left slds-text-title slds-m-bottom--small slds-m-top--small">
+                                                    <p>Update your page layouts to add the Files and Notes related lists and remove the Notes &amp; Attachments related list. All your page layouts that use the Notes &amp; Attachments related list are selected below.</p> 
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="slds-float--right slds-m-right--large slds-p-right--small">
+                                                <button id="addFileButton" class="slds-float--left slds-button slds-button--neutral  slds-m-right--small slds-m-bottom--x-small" 
+                                                        type="button"
+                                                        disabled = "false"
+                                                        onclick="metadataAddFilePrompt()" >Add Files Related List</button> 
+                                                <button id="addButton" class="slds-float--left slds-button slds-button--neutral  slds-m-right--small slds-m-bottom--x-small" 
+                                                        type="button"
+                                                        disabled = "false"
+                                                        onclick="metadataAddPrompt()" >Add Notes Related List</button>
+                                                <button id="removeButton" class="slds-float--left slds-button slds-button--neutral slds-m-bottom--x-small" 
+                                                        type="button"
+                                                        disabled = "false"
+                                                        onclick="metadataRemovePrompt()" >Remove Notes &amp; Attachments Related List</button>
+                                                
+                                            </div>
+                                        </div>
+                                        <apex:outputPanel id="metadataPanel">
+                                            <div class="slds-align--absolute-center" id="pagination">
+                                                
+                                                <apex:commandButton value="Previous" action="{!Previous}"
+                                                                    oncomplete="enableDisableButton()"
+                                                                    rerender="metadataPanel"
+                                                                    style="border-style: none; padding-left: 1rem; padding-right: 1rem;"
+                                                                    styleClass="slds-button"
+                                                                    disabled="{!DisablePrevious}" />
+                                                <apex:commandButton value="Next" action="{!Next}"
+                                                                    style="border-style: none; padding-left: 1rem; padding-right: 1rem;"
+                                                                    styleClass="slds-button"
+                                                                    oncomplete="enableDisableButton()"
+                                                                    reRender="metadataPanel"
+                                                                    disabled="{!DisableNext}" />
+                                                
+                                            </div>
+                                            <apex:dataTable value="{!metadataLayouts}"
+                                                            var="e"
+                                                            id="metadataLayoutTable"
+                                                            headerClass="slds-text-title--caps"
+                                                            style="line-height: 1.0;"
+                                                            styleClass="tableStyle slds-table slds-table--bordered slds-table--cell-buffer">
+                                                
+                                                <apex:column width="20">
+                                                    <apex:facet name="header">
+                                                        <apex:inputCheckbox onclick="selectUnselectAllLayouts()" id="selectUnselectAllLayoutsCheckbox">
+                                                            
+                                                        </apex:inputCheckbox>
+                                                    </apex:facet>
+                                                    <apex:inputCheckbox value="{!e.selected}"
+                                                                        onclick="enableDisableButton()"
+                                                                        id="objectCheckbox">
+                                                        
+                                                    </apex:inputCheckbox>
+                                                </apex:column>
+                                                <apex:column >
+                                                    <apex:facet name="header">OBJECT NAME</apex:facet>
+                                                    <apex:outputText id="objectName" value="{!e.objectName}" />
+                                                </apex:column>
+                                                <apex:column >
+                                                    <apex:facet name="header">NAME</apex:facet>
+                                                    <apex:outputText id="name" value="{!e.name}" />
+                                                    <apex:outputText value="{!e.fullName}" id="fullName" styleClass="slds-hide"/>
+                                                </apex:column>
+                                                <apex:column id="filesRLIcon" styleClass="slds-hide" width="80" style="text-align: center">
+                                                    <apex:facet name="header">HAS FILES RL</apex:facet>
+                                                    <apex:outputText value="{!e.filesRelatedList}" id="filesRL" styleClass="slds-hide"/>
+                                                    <span class="slds-icon_container slds-icon-standard-task2"
+                                                          style="padding: 3px;">
+                                                        <span class="slds-icon slds-icon_xx-small" 
+                                                              aria-hidden="true">
+                                                            <img src="{!URLFOR($Asset.SLDS, 'assets/icons/action/approval_60.png')}"  
+                                                                 class="slds-icon_xx-small"/>
+                                                        </span>
+                                                    </span>
+                                                </apex:column>
+                                                <apex:column id="notesRLIcon" styleClass="slds-hide" width="80" style="text-align: center" rendered="{!!notesNotEnabled}">
+                                                    <apex:facet name="header">HAS NOTES RL</apex:facet>
+                                                    <apex:outputText value="{!e.notesRelatedList}" id="notesRL" styleClass="slds-hide"/>
+                                                    <span class="slds-icon_container slds-icon-standard-task2"
+                                                          style="padding: 3px;">
+                                                        <span class="slds-icon slds-icon_xx-small" 
+                                                              aria-hidden="true">
+                                                            <img src="{!URLFOR($Asset.SLDS, 'assets/icons/action/approval_60.png')}"  
+                                                                 class="slds-icon_xx-small"/>
+                                                        </span>
+                                                    </span>
+                                                </apex:column>
+                                            </apex:dataTable>
+                                            <div class="slds-align--absolute-center" id="pagination">
+                                                
+                                                <apex:commandButton value="Previous" action="{!Previous}"
+                                                                    oncomplete="enableDisableButton()"
+                                                                    rerender="metadataPanel"
+                                                                    style="border-style: none; padding-left: 1rem; padding-right: 1rem;"
+                                                                    styleClass="slds-button"
+                                                                    disabled="{!DisablePrevious}" />
+                                                <apex:commandButton value="Next" action="{!Next}"
+                                                                    style="border-style: none; padding-left: 1rem; padding-right: 1rem;"
+                                                                    styleClass="slds-button"
+                                                                    oncomplete="enableDisableButton()"
+                                                                    reRender="metadataPanel"
+                                                                    disabled="{!DisableNext}" />
+                                                
+                                            </div>
+                                        </apex:outputPanel>
+                                        
+                                        <div class=" slds-m-left--large slds-p-left--small slds-text-title slds-m-bottom--small slds-m-top--large">
+                                            
+                                            <p class="slds-m-top--large">
+                                                Need help? Ask in our <a href="{!sucessComumunityGroupURL}"  target = "_blank">  Success Community Group.</a>
+                                            </p>
+                                            <p>
+                                                Are you finding this tool useful? Let others know by writing a review on the <a href="{!appExchangeURL}"  target = "_blank">  AppExchange.</a>
+                                            </p>
+                                            
+                                        </div>
+                                        <div class="slds-text-title slds-text-align_right slds-m-right--small slds-m-bottom--small">
+                                            Package Version {!version}
+                                        </div>
+                                    </div>
+                                    
+                                </div> 
+                        </div>
+                    </div>
+                    
+                </div>
+            </apex:form>
+        </div>
+    </html>
+</apex:page>

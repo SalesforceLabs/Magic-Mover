@@ -1,0 +1,95 @@
+<apex:page controller="NAMlastConvertedController" sidebar="false" title="Latest Files & Notes" id="lastConverted">
+    <html xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+        <apex:includeScript value="{!URLFOR($Resource.NMTjs, 'js/jquery_3_1_1.min.js')}"/>
+        <apex:slds />
+        
+        
+        <div class="altimetrik">
+            <apex:form id="form" styleClass="slds-m-around--x-small">
+                <div class="slds-grid">
+                    <div class="slds-size--2-of-2">                        
+                        <div class="slds-card slds-m-horizontal--small ">
+                            <div class="slds-m-top--x-small slds-clearfix" style="margin-top: 1%; margin-bottom: 1%;">
+                                <div class="slds-text-heading--small slds-m-bottom--x-small slds-m-top--medium 
+                                            slds-m-left--large" style="width: 50%">
+                                    Latest Files &amp; Notes
+                                </div>
+                                <div class="slds-m-left--large slds-text-title slds-m-bottom--large slds-m-top--small">
+                                    <p>Displays all Files and Notes, sorted by last modified date. Keep in mind that when an attachment or note is converted, the original last modified date is preserved.</p> 
+                                </div>
+                                <div>
+                                    
+                                    <apex:outputPanel id="lastConvertedPanel">
+                                        <apex:dataTable value="{!lastConverted}"
+                                                        var="e"
+                                                        id="lastConvertedTable"
+                                                        headerClass="slds-text-title--caps"
+                                                        style="line-height: 1.0;"
+                                                        styleClass="tableStyle slds-table slds-table--bordered slds-table--cell-buffer">
+                                            <apex:column width="35%">
+                                                <apex:facet name="header">TITLE</apex:facet>
+                                                <apex:outputLink value="/{! e.Id }" target="_blank" >{! e.Title }</apex:outputLink>
+                                            </apex:column>
+                                            <apex:column width="25%">
+                                                <apex:facet name="header">OWNER</apex:facet>
+                                                <apex:outputText id="owner" value="{!e.Owner.FirstName}" />
+                                            </apex:column> 
+                                            <apex:column width="20%">
+                                                <apex:facet name="header">FILE TYPE</apex:facet>
+                                                <apex:outputText id="fileType" value="{!e.FileType}" />
+                                            </apex:column> 
+                                            <apex:column width="20%">
+                                                <apex:facet name="header">CONTENT MODIFIED DATE</apex:facet>
+                                                <apex:outputText value="{0, date, yyyy/MM/dd HH:mm:ss}">
+                                                    <apex:param value="{!e.ContentModifiedDate}" /> 
+                                                </apex:outputText>
+                                            </apex:column>
+                                            
+                                        </apex:dataTable>
+                                        <apex:outputPanel rendered="{!Empty}">
+                                            <div class="slds-panel slds-align--absolute-center slds-text-body--regular slds-p-top--large slds-p-bottom--large">
+                                                No records
+                                            </div>
+                                            
+                                        </apex:outputPanel>
+                                        <div class="slds-align--absolute-center">
+                                            <apex:commandButton value="Previous" action="{!Previous}"
+                                                                rerender="lastConvertedPanel"
+                                                                style="border-style: none; padding-left: 1rem; padding-right: 1rem;"
+                                                                styleClass="slds-button"
+                                                                disabled="{!DisablePrevious}" />
+                                            <apex:commandButton value="Next" action="{!Next}"
+                                                                style="border-style: none; padding-left: 1rem; padding-right: 1rem;"
+                                                                styleClass="slds-button"
+                                                                reRender="lastConvertedPanel"
+                                                                disabled="{!DisableNext}" />
+                                            
+                                        </div>
+                                    </apex:outputPanel>
+                                    
+                                </div>
+                                
+                                <div class="slds-text-title  slds-m-left--large slds-m-bottom--small slds-m-top--large">
+                                    
+                                    <p class="slds-m-top--large">
+                                        Need help? Ask in our <a href="{!sucessComumunityGroupURL}"  target = "_blank">  Success Community Group.</a>
+                                    </p>
+                                    <p>
+                                        Are you finding this tool useful? Let others know by writing a review on the <a href="{!appExchangeURL}"  target = "_blank">  AppExchange.</a>
+                                    </p>
+                                    
+                                </div>
+                                <div class="slds-text-title slds-text-align_right slds-m-right--small">
+                                    Package Version {!version}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    
+                </div>
+                
+            </apex:form>
+        </div>
+    </html>
+</apex:page>

@@ -1,0 +1,409 @@
+<apex:page controller="NAMLastAttachmentsController" sidebar="false" title="Attachments" id="attachments">
+    <html xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+        <apex:includeScript value="{!URLFOR($Resource.NMTjs, 'js/jquery_3_1_1.min.js')}"/>
+        <apex:slds />
+        <style>
+            .dateFormat{
+            visibility:hidden;
+            }
+            .tableStyle{
+            border-collapse: separate !important;
+            }
+        </style>        
+        <script>
+        j$ = jQuery.noConflict(); 
+        
+        j$( document ).ready(function() {
+            console.log('started ');
+            document.getElementById('attachments:form:buttonConvert').disabled = true;
+            j$('#attachments\\:form\\:attachmentsTable tr').each(function(index) {
+                var objectCheckbox = document.getElementById('attachments:form:attachmentsTable:'+index+':objectCheckbox');
+                if(objectCheckbox){  
+                    document.getElementById('attachments:form:attachmentsTable:'+index+':objectCheckbox').style.display = 'none';
+                }
+            });
+            document.getElementById('attachments:form:buttonConvert').style.display = 'none';
+            document.getElementById('attachments:form:attachmentsTable:selectUnselectAllCheckbox').style.display = 'none';
+            
+            swapYears();
+        });
+        
+        function enableDisableMigrateButton(){  
+            var enableMigrateButton = true;
+            j$('#attachments\\:form\\:attachmentsTable tr').each(function(index) {
+                var checked = j$('#attachments\\:form\\:attachmentsTable\\:'+index+'\\:objectCheckbox').is(":checked");
+                //in progress object migration are disables, because of that we have to ask for disabled property of the checkbox                      
+                var disabled = j$('#attachments\\:form\\:attachmentsTable\\:'+index+'\\:objectCheckbox').is(":disabled");
+                if(checked && !disabled){
+                    enableMigrateButton = false;
+                }
+            });
+           document.getElementById('attachments:form:buttonConvert').disabled = enableMigrateButton; 
+        }
+        
+        
+        function setFocusOnLoad() {}
+        
+        function setdatepicker(){
+            document.getElementById('attachments:form:startDateIdOpp').readOnly = true;
+            document.getElementById('attachments:form:endDateIdOpp').readOnly = true;
+        }
+        
+        function isCompatible(){
+            var datefield=document.createElement("input");
+            datefield.setAttribute("type", "date");
+            if (datefield.type!="date"){
+                return false;        
+            }else{
+                return true;
+            }
+        }
+        
+        //for calendar component
+        var arYears = getYears();
+        
+        function swapYears(){
+            
+            if(document.getElementById('calYearPicker') != null) {
+                var select = document.getElementById('calYearPicker');
+                var curValue = select.value; 
+                var parentx = select.parentNode;
+                parentx.removeChild(select);
+                select = document.createElement('select');
+                select.size = 1;
+                select.id = 'calYearPicker';
+                select.name = 'calYearPicker';
+                parentx.appendChild(select);
+            }
+            if(select != null) {
+                for(x=0;x<25;x++) {     
+                    select.options[x] = new Option(arYears[x], arYears[x], false, false);
+                }
+            }
+            setdatepicker();
+        }
+        function getYears() {
+            var out = [];
+            // generate dates for the last 100 years
+            var currentTime = new Date()
+            var year = currentTime.getFullYear()
+            try {
+                for(x=0;x<25;x++) {
+                    out[x] = x+year-24;
+                }   
+                
+            } catch(error) {
+                alert(error);       
+            }   
+            return out;
+        }
+        
+        function checkIfMigrated(){
+            document.getElementById('promptError').style.display = 'none';
+            if(document.getElementById("attachments:form:optionOrderBy:1").checked){
+                document.getElementById('attachments:form:buttonConvert').style.display = 'inline';
+                document.getElementById('attachments:form:attachmentsTable:selectUnselectAllCheckbox').style.display = 'inline';
+                j$('#attachments\\:form\\:attachmentsTable tr').each(function(index) {
+                    var objectCheckbox = document.getElementById('attachments:form:attachmentsTable:'+index+':objectCheckbox');
+                    var isSupported = j$('#attachments\\:form\\:attachmentsTable\\:'+index+'\\:isSupported').val();
+                    if(objectCheckbox){  
+                        document.getElementById('attachments:form:attachmentsTable:'+index+':objectCheckbox').style.display = 'inline';
+                        
+                        if(isSupported == 'false'){
+                        document.getElementById('attachments:form:attachmentsTable:'+index+':objectCheckbox').disabled = true;
+                        }
+                    }
+                });
+            } else {
+                document.getElementById('attachments:form:buttonConvert').style.display = 'none';
+                document.getElementById('attachments:form:attachmentsTable:selectUnselectAllCheckbox').style.display = 'none';
+                j$('#attachments\\:form\\:attachmentsTable tr').each(function(index) {
+                    var objectCheckbox = document.getElementById('attachments:form:attachmentsTable:'+index+':objectCheckbox');
+                    if(objectCheckbox){  
+                        document.getElementById('attachments:form:attachmentsTable:'+index+':objectCheckbox').style.display = 'none';
+                    }
+                });
+                
+            }
+        }
+        
+        function clearSelections(){
+            document.getElementById('attachments:form:attachmentsTable:selectUnselectAllCheckbox').checked = false;
+            selectUnselectAll();
+        }
+        
+        function selectUnselectAll(){
+            var allSelected = document.getElementById('attachments:form:attachmentsTable:selectUnselectAllCheckbox').checked;
+            j$('#attachments\\:form\\:attachmentsTable tr').each(function(index) {
+                var objectCheckbox = document.getElementById('attachments:form:attachmentsTable:'+index+':objectCheckbox');
+                var disabled = j$('#attachments\\:form\\:attachmentsTable\\:'+index+'\\:objectCheckbox').is(":disabled");
+                if(objectCheckbox && !disabled){
+                    objectCheckbox.checked = allSelected; 
+                }
+            });
+        }
+        
+        function convertRun(){
+            console.log('convertRun');
+            var ids = "";
+            document.getElementById('attachments:form:buttonConvert').disabled = true;
+            j$('#attachments\\:form\\:attachmentsTable tr').each(function(index) {
+                var checked = j$('#attachments\\:form\\:attachmentsTable\\:'+index+'\\:objectCheckbox').is(":checked");
+                var isDisable = j$('#attachments\\:form\\:attachmentsTable\\:'+index+'\\:objectCheckbox').is(":disabled");
+                if(checked && !isDisable){
+                    var attachmentId = j$('#attachments\\:form\\:attachmentsTable\\:'+index+'\\:attachmentId').val();
+                    if(attachmentId != ''){
+                        ids+=attachmentId+',';
+                    }
+                }
+                
+            });
+            
+            Visualforce.remoting.Manager.invokeAction(
+                '{!$RemoteAction.NAMLastAttachmentsController.runConvertionRemote}',
+                ids, 
+                function(result, event){
+                    if (event.status) {
+                        if(result.length > 0){
+                            document.getElementById('promptError').style.display = 'inline';
+                            document.getElementById('errorMsg').innerHTML = result;
+                            
+                            setInterval(function(){ 
+                                j$("#attachments\\:form\\:infoButton").click();
+                            }, 8000);
+                        } else {
+                            j$("#attachments\\:form\\:infoButton").click();
+                        }
+                    } else if (event.type === 'exception') {
+                        console.error('Error running the conversion, message: '+event.message);
+                        document.getElementById('promptError').style.display = 'inline';
+                        document.getElementById('errorMsg').innerHTML = event.message;
+                        
+                    } else {
+                        console.error('Error running the conversion, message: '+event.message);
+                        document.getElementById('promptError').style.display = 'inline';
+                        document.getElementById('errorMsg').innerHTML = event.message;
+                    }
+                }, 
+                {escape: true}
+            );
+            
+            
+            
+        }
+        
+        </script>
+         <!-- START  message dialog -->
+        <div id="promptError" style="display: none; height: 4rem;">
+            <div class="slds-notify_container slds-is-relative">
+                <div class="slds-notify slds-notify_toast slds-theme_error" role="alert">
+                    <div class="slds-notify__content">
+                        <h2 class="slds-text-heading_small" id="errorMsg"></h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- END message dialog --> 
+        
+        <div class="altimetrik">
+            <apex:form id="form" styleClass="slds-m-around--x-small">
+                <div class="slds-grid slds-wrap slds-grid--pull-padded">
+                    <div class="slds-col--padded slds-size--1-of-1 slds-m-bottom--medium">                        
+                        <div class="slds-card slds-m-horizontal--small">
+                            <div class="slds-m-top--x-small">
+                                <apex:outputPanel id="datesAttachmentsPanel">
+                                    <div class="slds-clearfix slds-grid">
+                                        <div class="slds-col slds-size--3-of-12 slds-m-top--small">
+                                            <div class="slds-float--left slds-text-heading--small slds-m-top--xxx-small 
+                                                        slds-m-left--large slds-p-left--small" >                                    
+                                                Show items created between 
+                                            </div>
+                                        </div>
+                                        
+                                        
+                                        <div class="slds-col slds-size--9-of-12 slds-m-left--medium slds-p-left--small">
+                                            <div class="slds-grid">
+                                                <div class="slds-col slds-size--6-of-12 slds-m-top--small">
+                                                    <div class="slds-grid">
+                                                        <div style="margin-right: 5px; display: inline" class="slds-col slds-size--5-of-12">
+                                                            <apex:inputField styleClass="date form-control" style="width: 150px" id="startDateIdOpp"  value="{!startDateCV.LegacyNoteConvertedDate__c}"/>
+                                                        </div>
+                                                        <div style="margin-right: 5px; display: inline" class="slds-text-heading--small slds-m-top--xxx-small slds-col slds-size--2-of-12">
+                                                            and
+                                                        </div>
+                                                        <div style="margin-right: 5px; display: inline" class="slds-col slds-size--5-of-12">
+                                                            <apex:inputField style="width: 150px" styleClass="date form-control" id="endDateIdOpp"  value="{!endDateCV.LegacyNoteConvertedDate__c}"/>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="slds-col slds-size--6-of-12 slds-m-top--small" style="margin-right: 5px; display: inline;">
+                                                    
+                                                    <apex:outputPanel id="orderRadioPanel">
+                                                        <div class="slds-col--padded slds-m-left--large">
+                                                            <apex:selectRadio value="{!migratedString}" id="optionOrderBy">
+                                                                <apex:selectOptions value="{!orderByOptions}"/>
+                                                                <apex:actionSupport event="onchange" action="{!orderBy}" reRender="" />             
+                                                            </apex:selectRadio>
+                                                        </div>
+                                                    </apex:outputPanel>
+                                                </div>
+                                            </div>
+                                            <div class="slds-grid" style="margin-top: 5px">
+                                                <apex:outputText id="errorMessageId" styleClass="slds-m-bottom--small slds-m-top--small" style="color: red;" value="{!validationDateMessage}"></apex:outputText>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="slds-col--padded slds-size--1-of-12 slds-m-top--small">
+                                            <div class="slds-float--right"> 
+                                                <apex:commandButton styleClass="slds-button slds-button--neutral  slds-m-right--small slds-m-bottom--x-small"
+                                                                    action="{!loadInfo}"
+                                                                    oncomplete="clearSelections(),setdatepicker(),checkIfMigrated()"
+                                                                    rerender="lastAttachmentsPanel,datesAttachmentsPanel" id="infoButton"
+                                                                    value="Filter"/>
+                                                
+                                            </div>
+                                            
+                                        </div>
+                                        
+                                    </div>
+                                    
+                                </apex:outputPanel>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="slds-col--padded slds-size--1-of-1 slds-m-bottom--medium">                        
+                        <div class="slds-card slds-m-horizontal--small ">
+                            <div class="slds-m-top--x-small slds-clearfix" style="margin-top: 1%; margin-bottom: 1%;">
+                                <div class="slds-float--left">
+                                    <div class="slds-text-heading--small slds-m-bottom--x-small slds-m-top--medium 
+                                                slds-m-left--large" style="width: 50%">
+                                        Attachments
+                                    </div>
+                                    <div class="slds-m-left--large slds-text-title slds-m-bottom--large slds-m-top--small">
+                                        <p>Displays all Attachments according to filters.</p> 
+                                    </div>
+                                </div>
+                                <div class="slds-float--right">
+                                    
+                                    <apex:commandButton value="Convert"
+                                                        onclick="convertRun()"
+                                                        id="buttonConvert"
+                                                        styleClass="slds-button slds-button--neutral slds-m-right--small slds-m-bottom--x-small"
+                                                        />
+                                </div>
+                                <div>
+                                    
+                                    <apex:outputPanel id="lastAttachmentsPanel">
+                                        <apex:dataTable value="{!lastAttachments}"
+                                                        var="e"
+                                                        id="attachmentsTable"
+                                                        headerClass="slds-text-title--caps"
+                                                        style="line-height: 1.0;"
+                                                        styleClass="tableStyle slds-table slds-table--bordered slds-table--cell-buffer">
+                                            <apex:column width="20">
+                                                <apex:facet name="header">
+                                                    <apex:inputCheckbox onclick="selectUnselectAll(),enableDisableMigrateButton()" id="selectUnselectAllCheckbox">
+                                                        
+                                                    </apex:inputCheckbox>
+                                                </apex:facet>
+                                                <apex:inputCheckbox value="{!e.selected}"
+                                                                    onclick="enableDisableMigrateButton()"
+                                                                    id="objectCheckbox">
+                                                    
+                                                </apex:inputCheckbox>
+                                            </apex:column>
+                                            <apex:column >
+                                                <apex:facet name="header">NAME</apex:facet>
+                                                <apex:inputHidden id="attachmentId" value="{!e.attachmentId }" />
+                                                <apex:outputLink value="/{! e.attachmentId }" target="_blank" >{! e.attachmentName }</apex:outputLink>
+                                            </apex:column>
+                                            <apex:column >
+                                                <apex:facet name="header">PARENT</apex:facet>
+                                                <apex:outputLink value="/{! e.parentId }" target="_blank" >{! e.parent }</apex:outputLink>
+                                            </apex:column> 
+                                            <apex:column >
+                                                <apex:facet name="header">OWNER</apex:facet>
+                                                <apex:outputText id="owner" value="{!e.owner}" />
+                                            </apex:column> 
+                                            <apex:column >
+                                                <apex:facet name="header">APPROX SIZE (MB)</apex:facet>
+                                                <apex:outputText id="bodyLength" value="{!e.totalMBSize}" />
+                                            </apex:column> 
+                                            <apex:column >
+                                                <apex:facet name="header">CREATED DATE</apex:facet>
+                                                <apex:outputText value="{0, date, yyyy/MM/dd HH:mm:ss}">
+                                                    <apex:param value="{!e.createDate}" /> 
+                                                </apex:outputText>
+                                            </apex:column>
+                                            <apex:column id="supportedColumn" >
+                                                <apex:facet name="header">SUPPORTED</apex:facet>
+                                                <apex:inputHidden id="isSupported" value="{!e.supported}" />
+                                                <apex:outputText id="supported" />
+                                                <span class="{!e.showIcon} slds-m-left--large"
+                                                      style="padding: 3px;">
+                                                    <span class="slds-icon slds-icon_xx-small"
+                                                          aria-hidden="true">
+                                                        <img src="{!URLFOR($Asset.SLDS, 'assets/icons/action/approval_60.png')}"  
+                                                             class="slds-icon_xx-small"/>
+                                                    </span>
+                                                </span>
+                                                <span class="{!e.hideIcon} slds-m-left--large"
+                                                      style="padding: 3px;">
+                                                    <span class="slds-icon slds-icon_xx-small"
+                                                          aria-hidden="true">
+                                                        <img src="{!URLFOR($Asset.SLDS, 'assets/icons/action/reject_60.png')}"  
+                                                             class="slds-icon_xx-small"/>
+                                                    </span>
+                                                </span>
+                                            </apex:column>
+                                            
+                                        </apex:dataTable>
+                                        <apex:outputPanel rendered="{!Empty}">
+                                            <div class="slds-panel slds-align--absolute-center slds-text-body--regular slds-p-top--large slds-p-bottom--large">
+                                                No records
+                                            </div>
+                                            
+                                        </apex:outputPanel>
+                                        <div class="slds-align--absolute-center">
+                                            <apex:commandButton value="Previous" action="{!Previous}"
+                                                                rerender="lastAttachmentsPanel"
+                                                                style="border-style: none; padding-left: 1rem; padding-right: 1rem;"
+                                                                styleClass="slds-button"
+                                                                onclick="clearSelections()"
+                                                                disabled="{!DisablePrevious}" />
+                                            <apex:commandButton value="Next" action="{!Next}"
+                                                                style="border-style: none; padding-left: 1rem; padding-right: 1rem;"
+                                                                styleClass="slds-button"
+                                                                onclick="clearSelections()"
+                                                                reRender="lastAttachmentsPanel"
+                                                                disabled="{!DisableNext}" />
+                                            
+                                        </div>
+                                    </apex:outputPanel>
+                                    
+                                </div>
+                                
+                                <div class="slds-text-title  slds-m-left--large slds-m-bottom--small slds-m-top--large">
+                                    
+                                    <p class="slds-m-top--large">
+                                        Need help? Ask in our <a href="{!sucessComumunityGroupURL}"  target = "_blank">  Success Community Group.</a>
+                                    </p>
+                                    <p>
+                                        Are you finding this tool useful? Let others know by writing a review on the <a href="{!appExchangeURL}"  target = "_blank">  AppExchange.</a>
+                                    </p>
+                                    
+                                </div>
+                                <div class="slds-text-title slds-text-align_right slds-m-right--small">
+                                    Package Version {!version}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    
+                </div>
+                
+            </apex:form>
+        </div>
+    </html>
+</apex:page>

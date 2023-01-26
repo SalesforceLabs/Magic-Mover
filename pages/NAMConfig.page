@@ -1,0 +1,945 @@
+<apex:page sidebar="false" docType="html-5.0" id="configsPage" title="Configuration Page" controller="NAMConfigController">
+    <html xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+        
+        <apex:includeScript value="{!URLFOR($Resource.NMTjs, 'js/jquery_3_1_1.min.js')}"/>
+        <apex:slds />
+        
+        <style>
+            .input-text{
+            width: 100px !important
+            }
+            .input-textId{
+            width: 250px !important
+            }
+        </style>
+        
+        <script>
+        
+        j$ = jQuery.noConflict(); 
+        
+        j$( document ).ready(function() {
+            console.log('started ');
+        });
+        
+        //method used to check that user only fill numers
+        function inputLimiter(evt) {
+            var charCode = (evt.which) ? evt.which : evt.keyCode;
+            if (charCode == 13 || charCode != 46 && charCode > 31 
+                && (charCode < 48 || charCode > 57 && charCode < 96 || charCode > 105)) {
+                evt.preventDefault();
+                return false;
+            }
+            return true;
+        }
+        
+        function inputLimiterString(evt) {
+            var charCode = (evt.which) ? evt.which : evt.keyCode;
+            console.log('charCode: ' + charCode);
+            if((event.which === 48 
+                || event.which === 49
+                || event.which === 50
+                || event.which === 51
+                || event.which === 52
+                || event.which === 53
+                || event.which === 54
+                || event.which === 55
+                || event.which === 56
+                || event.which === 57) && event.shiftKey){
+                evt.preventDefault();
+                return false;
+            }
+            if (charCode == 13 || charCode != 13 && charCode != 46 && charCode > 31 
+                && (charCode < 48 || charCode > 57 && charCode < 65 || charCode > 90)) {
+                evt.preventDefault();
+                return false;
+            }
+            return true;
+        }
+        
+        function attachmentPrompt(){
+            j$('#promptError').hide();
+            j$('#promptSave').hide();
+            j$('#promptAttachment').show();
+            j$( "#modalAttachment" ).toggleClass( "slds-backdrop--close" );
+            j$( "#modalAttachment" ).toggleClass( "slds-backdrop--open" );
+        }
+        
+        function closeAttachmentModal(){
+            j$('#promptAttachment').hide();
+            j$( "#modalAttachment" ).toggleClass( "slds-backdrop--close" );
+            j$( "#modalAttachment" ).toggleClass( "slds-backdrop--open" );
+        }
+        
+        function notePrompt(){
+            j$('#promptError').hide();
+            j$('#promptSave').hide();
+            j$('#promptNote').show();
+            j$( "#modalNote" ).toggleClass( "slds-backdrop--close" );
+            j$( "#modalNote" ).toggleClass( "slds-backdrop--open" );
+        }
+        
+        function closeNoteModal(){
+            j$('#promptNote').hide();
+            j$( "#modalNote" ).toggleClass( "slds-backdrop--close" );
+            j$( "#modalNote" ).toggleClass( "slds-backdrop--open" );
+        }
+        
+        //method used to check if user isnt putting any value within input when trying to migrate byobject option
+        function emptyValueCheck(input, error, batch) {
+            if(error == null || error == 7 || error == 8){
+                if((error == 7  && (input.value.length >= 3 && input.value.length <= 18)) || ((error == null || error == 8) && (input.value.length == 15 || input.value.length == 18))){
+                    if(error == 7){
+                        document.getElementById('ownerFromMsg').style.display = "none";
+                    } 
+                    if(error == 8){
+                        document.getElementById('ownerToMsg').style.display = "none";
+                    } 
+                    if(error == null) {
+                        document.getElementById('ownerMsg').style.display = "none";
+                    }
+                    var enableButton = true;
+                    if(document.getElementById('metadataMsg').style.display === "none" 
+                       && document.getElementById('attachmentsMsg').style.display === "none" 
+                       && document.getElementById('notesMsg').style.display === "none"){
+                        if(document.getElementById('dynamicMsg')){
+                            if(document.getElementById('dynamicMsg').style.display === "inline"){
+                                enableButton = false;
+                            }
+                        }
+                        if(document.getElementById('bodyLengthMsg')){
+                            if(document.getElementById('bodyLengthMsg').style.display === "inline"){
+                                enableButton = false;
+                            }
+                        }
+                        if(document.getElementById('schedulerMsg')){
+                            if(document.getElementById('schedulerMsg').style.display === "inline"){
+                                enableButton = false;
+                            }
+                        }timeoutMsg
+                        if(document.getElementById('timeoutMsg')){
+                            if(document.getElementById('timeoutMsg').style.display === "inline"){
+                                enableButton = false;
+                            }
+                        }
+                        
+                        if(document.getElementById('ownerMsg')){
+                            if(document.getElementById('ownerMsg').style.display === "inline"){
+                                enableButton = false;
+                            }
+                        }
+                        if(document.getElementById('ownerFromMsg')){
+                            if(document.getElementById('ownerFromMsg').style.display === "inline"){
+                                enableButton = false;
+                            }
+                        }
+                        
+                        if(document.getElementById('ownerToMsg')){
+                            if(document.getElementById('ownerToMsg').style.display === "inline"){
+                                enableButton = false;
+                            }
+                        }
+                        
+                        if(enableButton){
+                            document.getElementById('configsPage:form:configButton').disabled = false;
+                        }
+                    }
+                    
+                } else {
+                    if(error == 7){
+                        document.getElementById('ownerFromMsg').style.display = "inline";
+                    }
+                    if(error == 8){
+                        document.getElementById('ownerToMsg').style.display = "inline";
+                    }
+                    if(error == null){
+                        document.getElementById('ownerMsg').style.display = "inline";
+                    }
+                    document.getElementById('configsPage:form:configButton').disabled = true;
+                }
+                
+            } else {
+                if(batch == null){
+                    if(input.value >= 1){
+                        if(error == 5){
+                            document.getElementById('bodyLengthMsg').style.display = "none";
+                        }
+                        if(error == 6){
+                            document.getElementById('schedulerMsg').style.display = "none";
+                        }
+                        if(error == 9){
+                            document.getElementById('timeoutAttachmentMsg').style.display = "none";
+                        }
+                        if(error == 10){
+                            document.getElementById('timeoutNoteMsg').style.display = "none";
+                        }
+                        
+                        document.getElementById('configsPage:form:configButton').disabled = false;
+                    } else {   
+                        if(error == 5){
+                            document.getElementById('bodyLengthMsg').style.display = "inline";
+                        }
+                        if(error == 6){
+                            document.getElementById('schedulerMsg').style.display = "inline";
+                        }
+                        if(error == 9){
+                            document.getElementById('timeoutAttachmentMsg').style.display = "inline";
+                        }
+                        if(error == 10){
+                            document.getElementById('timeoutNoteMsg').style.display = "inline";
+                        }
+                        document.getElementById('configsPage:form:configButton').disabled = true;
+                    }
+                } else{
+                    if(batch){
+                        if(input.value <= 1000 && input.value >= 1){
+                            if(error == 1){
+                                document.getElementById('attachmentsMsg').style.display = "none";
+                            }
+                            if(error == 2){
+                                document.getElementById('notesMsg').style.display = "none";
+                            }
+                            if(error == 4){
+                                document.getElementById('dynamicMsg').style.display = "none";
+                            }
+                            document.getElementById('configsPage:form:configButton').disabled = false;
+                        } else {
+                            if(input.value > 1000){
+                                input.value = '1000';  
+                                document.getElementById('configsPage:form:configButton').disabled = false;
+                            } else {
+                                if(error == 1){
+                                    document.getElementById('attachmentsMsg').style.display = "inline";
+                                }
+                                if(error == 2){
+                                    document.getElementById('notesMsg').style.display = "inline";
+                                }
+                                if(error == 4){
+                                    document.getElementById('dynamicMsg').style.display = "inline";
+                                }
+                                document.getElementById('configsPage:form:configButton').disabled = true;
+                            }
+                        }
+                    } else {
+                        if(input.value <= 1000 && input.value >= 10){
+                            document.getElementById('metadataMsg').style.display = "none";
+                            document.getElementById('configsPage:form:configButton').disabled = false;
+                        } else {
+                            if(input.value > 1000){
+                                input.value = '1000';  
+                                document.getElementById('configsPage:form:configButton').disabled = false;
+                            } else {
+                                if(error == 3){
+                                    document.getElementById('metadataMsg').style.display = "inline";
+                                }
+                                document.getElementById('configsPage:form:configButton').disabled = true;
+                            }
+                        }
+                    }
+                }
+                
+                if(!j$.isNumeric(Number(input.value))){
+                    input.value = 0;
+                    document.getElementById('configsPage:form:configButton').disabled = true;
+                }
+                if(document.getElementById('metadataMsg').style.display === "inline" 
+                   || document.getElementById('attachmentsMsg').style.display === "inline" 
+                   || document.getElementById('notesMsg').style.display === "inline"
+                   ||(document.getElementById('dynamicMsg') && document.getElementById('dynamicMsg').style.display === "inline")
+                   || (document.getElementById('bodyLengthMsg') && document.getElementById('bodyLengthMsg').style.display === "inline")
+                   || (document.getElementById('schedulerMsg') && document.getElementById('schedulerMsg').style.display === "inline")
+                   || (document.getElementById('timeoutAttachmentMsg') && document.getElementById('timeoutAttachmentMsg').style.display === "inline")
+                   || (document.getElementById('timeoutNoteMsg') && document.getElementById('timeoutNoteMsg').style.display === "inline")
+                   || (document.getElementById('ownerMsg') && document.getElementById('ownerMsg').style.display === "inline")
+                   || (document.getElementById('ownerFromMsg') && document.getElementById('ownerFromMsg').style.display === "inline")
+                   || (document.getElementById('ownerToMsg') && document.getElementById('ownerToMsg').style.display === "inline")){
+                    document.getElementById('configsPage:form:configButton').disabled = true;
+                }   
+            }
+        }
+        </script>
+        
+        <!-- START  message dialog -->
+        <div class="{!showHide}" id="promptSave" style="{!highMessage}">
+            <div class="slds-notify_container slds-is-relative">
+                <div class="slds-notify slds-notify_toast slds-theme_success" role="alert">
+                    <div class="slds-notify__content">
+                        <h2 class="slds-text-heading_small">{!message}</h2>
+                        <h4 class="slds-text-heading_small {!showHideOwner}">{!messageOwner}</h4>
+                        <h4 class="slds-text-heading_small {!showHideOwnerFromTo}">{!messageOwnerFromTo}</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- END message dialog -->  
+        
+        <!-- START  error message dialog -->
+        <div class="{!showHideError}" id="promptError" style="height: 4rem;">
+            <div class="slds-notify_container slds-is-relative">
+                <div class="slds-notify slds-notify_toast slds-theme_error" role="alert">
+                    <div class="slds-notify__content">
+                        <h2 class="slds-text-heading_small">{!errorMessage}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- END error message dialog --> 
+        
+        
+        
+        
+        <div class="slds-grid slds-wrap slds-grid_pull-padded">
+            <div class="slds-p-horizontal_small slds-size_1-of-1">
+                
+                <div class="slds-card slds-box">
+                    
+                    <div class="slds-text-heading--small slds-m-bottom--medium">                                    
+                        Configuration parameters
+                    </div>
+                    
+                    <apex:form id="form">
+                        <!-- START confirm Reset Attachment tool dialog -->
+                        <div role="alertdialog" tabindex="-1" aria-labelledby="prompt-heading-id" 
+                             aria-describedby="prompt-message-wrapper" class="slds-modal slds-fade-in-open slds-modal--prompt slds-hide" id="promptAttachment">
+                            <div class="slds-modal__container">
+                                <div class="slds-modal__header slds-theme--error slds-theme--alert-texture">
+                                    <h2 class="slds-text-heading--medium" id="prompt-heading-id">Reset Attachments conversion?</h2>                                        
+                                </div>
+                                <div class="slds-modal__content slds-p-around--medium">              
+                                    <p>You're resetting Attachments conversion</p>
+                                    <br/>
+                                </div>
+                                <div class="slds-modal__footer slds-theme--default">
+                                    <a href="#" class="slds-button slds-button--neutral slds-m-right--small slds-m-bottom--x-small" onClick="closeAttachmentModal()">Cancel</a>
+                                    <apex:commandButton styleClass="slds-button slds-button--neutral slds-m-right--small slds-m-bottom--x-small" 
+                                                        action="{!resetAttachmentsConversion}"
+                                                        value="Accept"/>
+                                    
+                                    
+                                </div>
+                            </div>
+                        </div>
+                        <div class="slds-backdrop slds-backdrop--close" id="modalAttachment"></div>  
+                        <!-- END confirm dialog -->
+                        
+                        <!-- START confirm Reset Note tool dialog -->
+                        <div role="alertdialog" tabindex="-1" aria-labelledby="prompt-heading-id" 
+                             aria-describedby="prompt-message-wrapper" class="slds-modal slds-fade-in-open slds-modal--prompt slds-hide" id="promptNote">
+                            <div class="slds-modal__container">
+                                <div class="slds-modal__header slds-theme--error slds-theme--alert-texture">
+                                    <h2 class="slds-text-heading--medium" id="prompt-heading-id">Reset Notes conversion?</h2>                                        
+                                </div>
+                                <div class="slds-modal__content slds-p-around--medium">              
+                                    <p>You're resetting Notes conversion</p>
+                                    <br/>
+                                </div>
+                                <div class="slds-modal__footer slds-theme--default">
+                                    <a href="#" class="slds-button slds-button--neutral slds-m-right--small slds-m-bottom--x-small" onClick="closeNoteModal()">Cancel</a>
+                                    <apex:commandButton styleClass="slds-button slds-button--neutral slds-m-right--small slds-m-bottom--x-small" 
+                                                        action="{!resetNotesConversion}"
+                                                        value="Accept"/>
+                                    
+                                    
+                                </div>
+                            </div>
+                        </div>
+                        <div class="slds-backdrop slds-backdrop--close" id="modalNote"></div>  
+                        <!-- END confirm dialog -->
+                        
+                        <div class="slds-clearfix slds-grid slds-gutters">
+                            <div class="slds-col slds-size_3-of-4 slds-grid slds-gutters">
+                                <div class="slds-col slds-size_1-of-4">
+                                    <!-- START Form -->
+                                    <div class="slds-form slds-form_stacked">
+                                        <div class="slds-form-element">
+                                            <label class="slds-form-element__label" for="attachmentsBatch">Batch size - Attachment conversion job</label>
+                                            <div class="slds-form-element__control">
+                                                <apex:inputText value="{!attachmentsBatchSize}" id="attachmentsBatch" 
+                                                                onKeyDown="inputLimiter(event);" onKeyUp="emptyValueCheck(this, 1, true);"
+                                                                styleClass="slds-input input-text" maxlength="4" />  <div id="attachmentsMsg" class="slds-form-element__label slds-m-left--x-small" style="color: red; display: none;">
+                                                The minimum batch size is 1 </div>
+                                                
+                                            </div>
+                                        </div>
+                                        <div class="slds-form-element">
+                                            <label class="slds-form-element__label" for="notesBatch">Batch size - Notes conversion job</label>
+                                            <div class="slds-form-element__control">
+                                                <apex:inputText value="{!notesBatchSize}" maxlength="4" id="notesBatch"
+                                                                onKeyDown="inputLimiter(event);" onKeyUp="emptyValueCheck(this,2, true);"
+                                                                styleClass="slds-input input-text"/> <div class="slds-form-element__label slds-m-left--x-small" id="notesMsg" style="color: red; display: none;">
+                                                The minimum batch size is 1 </div>
+                                            </div>
+                                        </div>
+                                        <div class="slds-form-element">
+                                            <label class="slds-form-element__label" for="metadataPageSize">Update Page Layout - page size</label>
+                                            <div class="slds-form-element__control">
+                                                <apex:inputText value="{!metadataPageSize}" maxlength="4" id="metadataPageSize"
+                                                                onKeyDown="inputLimiter(event);" onKeyUp="emptyValueCheck(this,3, false);"
+                                                                styleClass="slds-input input-text"/> <div class="mouseOverInfoOuter slds-m-left--x-small" id="searchInvoiceHelper" onfocus="addMouseOver(this)" onmouseover="addMouseOver(this)" tabindex="0">
+                                                <img src="/s.gif" alt="" class="infoIcon" title="" />
+                                                <div class="mouseOverInfo" id="searchInvoiceHelperText" style="display: none; opacity: -0.19999999999999996; left: 1px;">
+                                                    <div class="slds-popover__body" style="font-size:13px">
+                                                        Choose a smaller page size if the Update Page Layout tool times out when loading page layouts.
+                                                    </div>
+                                                </div>
+                                                </div> <div id="metadataMsg" class="slds-form-element__label slds-m-left--x-small" style="color: red; display: none;">
+                                                The minimum page size is 10 </div>
+                                            </div>
+                                        </div>
+                                    </div> <!-- END Form -->
+                                </div>
+                                <div class="slds-col slds-size_3-of-4 slds-border_left slds-border_right slds-p-left_large">
+                                    <apex:outputPanel id="minBatchPanel">
+                                        <div class="slds-form-element">
+                                            <label class="slds-form-element__label" for="checkboxPrivate">
+                                                Enable Dynamic Batch Size 
+                                                <apex:inputCheckbox value="{!enableDynamicBatchSize}" id="checkboxPrivate" label="enableDynamicBatchSize" styleClass="slds-m-left--small">
+                                                    <apex:actionsupport event="onchange" rerender="minBatchPanel" />
+                                                </apex:inputCheckbox><div class="mouseOverInfoOuter slds-m-left--x-small" id="searchInvoiceHelper" onfocus="addMouseOver(this)" onmouseover="addMouseOver(this)" tabindex="0">
+                                                <img src="/s.gif" alt="" class="infoIcon" title="" />
+                                                <div class="mouseOverInfo" id="searchInvoiceHelperText" style="display: none; opacity: -0.19999999999999996; left: 1px;">
+                                                    <div class="slds-popover__body" style="font-size:13px">
+                                                        Selects a smaller batch size automatically when large records are detected.
+                                                    </div>
+                                                </div>
+                                                </div>
+                                            </label>
+                                            
+                                        </div>
+                                        <apex:outputPanel rendered="{!enableDynamicBatchSize}">
+                                            <div class="slds-form-element" >
+                                                <label class="slds-form-element__label" for="minBatch">Minimum Batch Size</label>
+                                                <div class="slds-form-element__control">
+                                                    <apex:inputText value="{!minBatchSize}" maxlength="6" size="6" id="minBatch" 
+                                                                    onKeyDown="inputLimiter(event);" onKeyUp="emptyValueCheck(this,4, true);"
+                                                                    styleClass="slds-input input-text  slds-m-bottom--small"/> <div class="mouseOverInfoOuter slds-m-left--x-small" id="searchInvoiceHelper" onfocus="addMouseOver(this)" onmouseover="addMouseOver(this)" tabindex="0">
+                                                    <img src="/s.gif" alt="" class="infoIcon" title="" />
+                                                    <div class="mouseOverInfo" id="searchInvoiceHelperText" style="display: none; opacity: -0.19999999999999996; left: 1px;">
+                                                        <div class="slds-popover__body" style="font-size:13px">
+                                                            Minimum Batch Size. 
+                                                            
+                                                        </div>
+                                                    </div>
+                                                    </div>
+                                                </div>
+                                                <div class="slds-form-element__label" id="dynamicMsg" style="color: red; display: none;">
+                                                    The minimum batch size is 1 </div>
+                                            </div>
+                                        </apex:outputPanel>
+                                    </apex:outputPanel>
+                                    <br/>
+                                    <apex:outputPanel id="ownerPanel">
+                                        <div class="slds-form-element">
+                                            <label class="slds-form-element__label" for="checkboxOwner">
+                                                Set record owner id for all converted records
+                                                <apex:inputCheckbox value="{!enableOwner}" id="checkboxOwner" label="enableOwner" styleClass="slds-m-left--small">
+                                                    <apex:actionsupport event="onchange" rerender="ownerPanel" />
+                                                </apex:inputCheckbox><div class="mouseOverInfoOuter slds-m-left--x-small" id="searchInvoiceHelper" onfocus="addMouseOver(this)" onmouseover="addMouseOver(this)" tabindex="0">
+                                                <img src="/s.gif" alt="" class="infoIcon" title="" />
+                                                <div class="mouseOverInfo" id="searchInvoiceHelperText" style="display: none; opacity: -0.19999999999999996; left: 1px;">
+                                                    <div class="slds-popover__body" style="font-size:13px">
+                                                        Check this setting, specify an owner id, and we'll use that owner id as the record owner for the converted file or note.
+                                                    </div>
+                                                </div>
+                                                </div>
+                                            </label>
+                                            
+                                        </div>
+                                        <apex:outputPanel rendered="{!enableOwner}">
+                                            <div class="slds-form-element" >
+                                                <label class="slds-form-element__label" for="owner">User Id</label>
+                                                <div class="slds-form-element__control">
+                                                    <apex:inputText value="{!owner}" maxlength="18" size="18" id="owner" 
+                                                                    onKeyUp="emptyValueCheck(this,null,null);" onKeyDown="inputLimiterString(event);"
+                                                                    styleClass="slds-input input-textId  slds-m-bottom--small"/> <div class="mouseOverInfoOuter slds-m-left--x-small" id="searchInvoiceHelper" onfocus="addMouseOver(this)" onmouseover="addMouseOver(this)" tabindex="0">
+                                                    <img src="/s.gif" alt="" class="infoIcon" title="" />
+                                                    <div class="mouseOverInfo" id="searchInvoiceHelperText" style="display: none; opacity: -0.19999999999999996; left: 1px;">
+                                                        <div class="slds-popover__body" style="font-size:13px">
+                                                            User Id 
+                                                            
+                                                        </div>
+                                                    </div>
+                                                    </div>
+                                                </div>
+                                                <div class="slds-form-element__label" id="ownerMsg" style="color: red; display: none;">
+                                                    Invalid Id</div>
+                                            </div>
+                                        </apex:outputPanel>
+                                    </apex:outputPanel>
+                                    <br/>
+                                    <apex:outputPanel id="ownerFromToPanel">
+                                        <div class="slds-form-element">
+                                            <label class="slds-form-element__label" for="checkboxOwnerFromTo">
+                                                Set record owner id for certain converted records
+                                                <apex:inputCheckbox value="{!enableOwnerFromTo}" id="checkboxOwnerFromTo" label="enableOwnerFromTo" styleClass="slds-m-left--small">
+                                                    <apex:actionsupport event="onchange" rerender="ownerFromToPanel" />
+                                                </apex:inputCheckbox><div class="mouseOverInfoOuter slds-m-left--x-small" id="searchInvoiceHelper" onfocus="addMouseOver(this)" onmouseover="addMouseOver(this)" tabindex="0">
+                                                <img src="/s.gif" alt="" class="infoIcon" title="" />
+                                                <div class="mouseOverInfo" id="searchInvoiceHelperText" style="display: none; opacity: -0.19999999999999996; left: 1px;">
+                                                    <div class="slds-popover__body" style="font-size:13px">
+                                                        Specify a record prefix or specific user id.  When converting attachments and classic notes, we'll check to see if the current record owner matches the specified pattern.  If it does, we'll set the record owner to the one specified.
+                                                    </div>
+                                                </div>
+                                                </div>
+                                            </label>
+                                            
+                                        </div>
+                                        <apex:outputPanel rendered="{!enableOwnerFromTo}">
+                                            
+                                            <div class="slds-grid slds-gutters" >
+                                                <div class="slds-col">
+                                                    <label class="slds-form-element__label" for="ownerFrom">Id or Start of a User Id</label>
+                                                    <div class="slds-form-element__control">
+                                                        <apex:inputText value="{!ownerFrom}" maxlength="18" size="18" id="ownerFrom" 
+                                                                        onKeyUp="emptyValueCheck(this,7,null);" onKeyDown="inputLimiterString(event);"
+                                                                        styleClass="slds-input input-textId  slds-m-bottom--small"/> <div class="mouseOverInfoOuter slds-m-left--x-small" id="searchInvoiceHelper" onfocus="addMouseOver(this)" onmouseover="addMouseOver(this)" tabindex="0">
+                                                        <img src="/s.gif" alt="" class="infoIcon" title="" />
+                                                        <div class="mouseOverInfo" id="searchInvoiceHelperText" style="display: none; opacity: -0.19999999999999996; left: 1px;">
+                                                            <div class="slds-popover__body" style="font-size:13px">
+                                                                User Id or Start  
+                                                                
+                                                            </div>
+                                                        </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="slds-form-element__label" id="ownerFromMsg" style="color: red; display: none;">
+                                                        Value must have at least 3 characters</div>
+                                                </div>
+                                                <div  class="slds-col slds-m-top--large slds-form-element__label">
+                                                    TO  
+                                                </div>
+                                                <div class="slds-col"> 
+                                                    <label class="slds-form-element__label" for="ownerTo">User Id to set</label>
+                                                    <div class="slds-form-element__control">
+                                                        <apex:inputText value="{!ownerTo}" maxlength="18" size="18" id="ownerTo" 
+                                                                        onKeyUp="emptyValueCheck(this,8,null);" onKeyDown="inputLimiterString(event);"
+                                                                        styleClass="slds-input input-textId  slds-m-bottom--small"/> <div class="mouseOverInfoOuter slds-m-left--x-small" id="searchInvoiceHelper" onfocus="addMouseOver(this)" onmouseover="addMouseOver(this)" tabindex="0">
+                                                        <img src="/s.gif" alt="" class="infoIcon" title="" />
+                                                        <div class="mouseOverInfo" id="searchInvoiceHelperText" style="display: none; opacity: -0.19999999999999996; left: 1px;">
+                                                            <div class="slds-popover__body" style="font-size:13px">
+                                                                User Id 
+                                                                
+                                                            </div>
+                                                        </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="slds-form-element__label" id="ownerToMsg" style="color: red; display: none;">
+                                                        Invalid Id</div>
+                                                </div>
+                                            </div>
+                                        </apex:outputPanel>
+                                    </apex:outputPanel>
+                                    <br/>
+                                    <apex:outputPanel id="bodyLengthPanel">
+                                        <div class="slds-form-element">
+                                            <label class="slds-form-element__label" for="checkboxBodyLength">
+                                                Limit attachments size conversion 
+                                                <apex:inputCheckbox value="{!enableBodyLength}" id="checkboxBodyLength" label="enableBodyLength" styleClass="slds-m-left--small">
+                                                    <apex:actionsupport event="onchange" rerender="bodyLengthPanel" />
+                                                </apex:inputCheckbox><div class="mouseOverInfoOuter slds-m-left--x-small" id="searchInvoiceHelper" onfocus="addMouseOver(this)" onmouseover="addMouseOver(this)" tabindex="0">
+                                                <img src="/s.gif" alt="" class="infoIcon" title="" />
+                                                <div class="mouseOverInfo" id="searchInvoiceHelperText" style="display: none; opacity: -0.19999999999999996; left: 1px;">
+                                                    <div class="slds-popover__body" style="font-size:13px">
+                                                        Check to limit the size of records to migrate. This is useful If you experience heap size limit problems or any other error related to big attachments.
+                                                    </div>
+                                                </div>
+                                                </div>
+                                            </label>
+                                            
+                                        </div>
+                                        <apex:outputPanel rendered="{!enableBodyLength}">
+                                            <div class="slds-form-element" >
+                                                <label class="slds-form-element__label" for="bodyLength">Size in MB</label>
+                                                <div class="slds-form-element__control">
+                                                    <apex:inputText value="{!bodyLength}" maxlength="6" size="6" id="bodyLength" 
+                                                                    onKeyDown="inputLimiter(event);" onKeyUp="emptyValueCheck(this,5,null);"
+                                                                    styleClass="slds-input input-text slds-m-bottom--small"/> <span class="slds-m-left--x-small">MB</span>   <div class="mouseOverInfoOuter slds-m-left--x-small" id="searchInvoiceHelper" onfocus="addMouseOver(this)" onmouseover="addMouseOver(this)" tabindex="0">
+                                                    <img src="/s.gif" alt="" class="infoIcon" title="" />
+                                                    <div class="mouseOverInfo" id="searchInvoiceHelperText" style="display: none; opacity: -0.19999999999999996; left: 1px;">
+                                                        <div class="slds-popover__body" style="font-size:13px">
+                                                            The tool will convert attachments up to this size.
+                                                            
+                                                        </div>
+                                                    </div>
+                                                    </div>
+                                                </div>
+                                                <div class="slds-form-element__label" id="bodyLengthMsg" style="color: red; display: none;">
+                                                    The minimum Attachments Max Body Length Size is 1 </div>
+                                            </div>
+                                        </apex:outputPanel>
+                                    </apex:outputPanel>
+                                    <br/>
+                                    <apex:outputPanel id="schedulerPanel">
+                                        <div class="slds-form-element">
+                                            <label class="slds-form-element__label" for="checkboxScheduler">
+                                                Schedule migration over multiple days
+                                                <apex:inputCheckbox value="{!enableScheduler}" id="checkboxScheduler" label="enableScheduler" styleClass="slds-m-left--small">
+                                                    <apex:actionsupport event="onchange" rerender="schedulerPanel" />
+                                                </apex:inputCheckbox><div class="mouseOverInfoOuter slds-m-left--x-small" id="searchInvoiceHelper" onfocus="addMouseOver(this)" onmouseover="addMouseOver(this)" tabindex="0">
+                                                <img src="/s.gif" alt="" class="infoIcon" title="" />
+                                                <div class="mouseOverInfo" id="searchInvoiceHelperText" style="display: none; opacity: -0.19999999999999996; left: 1px;">
+                                                    <div class="slds-popover__body" style="font-size:13px">
+                                                        Check this box to schedule the attachments and notes migration over multiple days.  Specify a batch size, and that's the number of records that will be migrated daily per Object.  This setting is helpful if you want to throttle your migration.
+                                                    </div>
+                                                </div>
+                                                </div>
+                                            </label>
+                                            
+                                        </div>
+                                        <apex:outputPanel rendered="{!enableScheduler}">
+                                            <div class="slds-form-element" >
+                                                <label class="slds-form-element__label" for="schedulerSize">Scheduler Size</label>
+                                                <div class="slds-form-element__control">
+                                                    <apex:inputText value="{!schedulerSize}" maxlength="6" size="6" id="schedulerSize" 
+                                                                    onKeyDown="inputLimiter(event);" onKeyUp="emptyValueCheck(this,6, null);"
+                                                                    styleClass="slds-input input-text"/> <div class="mouseOverInfoOuter slds-m-left--x-small" id="searchInvoiceHelper" onfocus="addMouseOver(this)" onmouseover="addMouseOver(this)" tabindex="0">
+                                                    <img src="/s.gif" alt="" class="infoIcon" title="" />
+                                                    <div class="mouseOverInfo" id="searchInvoiceHelperText" style="display: none; opacity: -0.19999999999999996; left: 1px;">
+                                                        <div class="slds-popover__body" style="font-size:13px">
+                                                            Scheduler Size. 
+                                                        </div>
+                                                    </div>
+                                                    </div>
+                                                </div>
+                                                <div class="slds-form-element__label" id="schedulerMsg" style="color: red; display: none;">
+                                                    The minimum Scheduler value is 1</div>
+                                            </div>
+                                        </apex:outputPanel>
+                                    </apex:outputPanel>
+                                    <br/>
+                                    <apex:outputPanel id="timeoutAttachmentPanel">
+                                        <div class="slds-form-element">
+                                            <label class="slds-form-element__label" for="checkboxTimeoutAttachment">
+                                                Set timeout for Attachments to Files filter
+                                                <apex:inputCheckbox value="{!enableTimeoutAttachment}" id="checkboxTimeoutAttachment" label="enableTimeoutAttachment" styleClass="slds-m-left--small">
+                                                    <apex:actionsupport event="onchange" rerender="timeoutAttachmentPanel" />
+                                                </apex:inputCheckbox><div class="mouseOverInfoOuter slds-m-left--x-small" id="timeoutAttachmentInvoiceHelper" onfocus="addMouseOver(this)" onmouseover="addMouseOver(this)" tabindex="0">
+                                                <img src="/s.gif" alt="" class="infoIcon" title="" />
+                                                <div class="mouseOverInfo" id="timeoutAttachmentInvoiceHelperText" style="display: none; opacity: -0.19999999999999996; left: 1px;">
+                                                    <div class="slds-popover__body" style="font-size:13px">
+                                                        If you’re having query timeout issues with the Attachments to Files migration tool, try setting the timeout value to a larger value.
+                                                    </div>
+                                                </div>
+                                                </div>
+                                            </label>
+                                            
+                                        </div>
+                                        <apex:outputPanel rendered="{!enableTimeoutAttachment}">
+                                            <div class="slds-form-element" >
+                                                <label class="slds-form-element__label" for="timeoutAttachmentSize">Timeout value (in milliseconds)</label>
+                                                <div class="slds-form-element__control">
+                                                    <apex:inputText value="{!timeoutAttachmentSize}" maxlength="6" size="6" id="timeoutAttachmentSize" 
+                                                                    onKeyDown="inputLimiter(event);" onKeyUp="emptyValueCheck(this,9, null);"
+                                                                    styleClass="slds-input input-text"/> 
+                                                </div>
+                                                <div class="slds-form-element__label" id="timeoutAttachmentMsg" style="color: red; display: none;">
+                                                    The minimum value is 1</div>
+                                            </div>
+                                        </apex:outputPanel>
+                                    </apex:outputPanel>
+                                    <br/>
+                                    <apex:outputPanel id="timeoutNotePanel">
+                                        <div class="slds-form-element">
+                                            <label class="slds-form-element__label" for="checkboxTimeoutNote">
+                                                Set timeout for Notes Conversion filter
+                                                <apex:inputCheckbox value="{!enableTimeoutNote}" id="checkboxTimeoutNote" label="enableTimeoutNote" styleClass="slds-m-left--small">
+                                                    <apex:actionsupport event="onchange" rerender="timeoutNotePanel" />
+                                                </apex:inputCheckbox><div class="mouseOverInfoOuter slds-m-left--x-small" id="timeoutNoteInvoiceHelper" onfocus="addMouseOver(this)" onmouseover="addMouseOver(this)" tabindex="0">
+                                                <img src="/s.gif" alt="" class="infoIcon" title="" />
+                                                <div class="mouseOverInfo" id="timeoutNoteInvoiceHelperText" style="display: none; opacity: -0.19999999999999996; left: 1px;">
+                                                    <div class="slds-popover__body" style="font-size:13px">
+                                                        If you’re having query timeout issues with the Notes Conversion migration tool, try setting the timeout value to a larger value.
+                                                    </div>
+                                                </div>
+                                                </div>
+                                            </label>
+                                            
+                                        </div>
+                                        <apex:outputPanel rendered="{!enableTimeoutNote}">
+                                            <div class="slds-form-element" >
+                                                <label class="slds-form-element__label" for="timeoutSize">Timeout value (in milliseconds)</label>
+                                                <div class="slds-form-element__control">
+                                                    <apex:inputText value="{!timeoutNoteSize}" maxlength="6" size="6" id="timeoutNoteSize" 
+                                                                    onKeyDown="inputLimiter(event);" onKeyUp="emptyValueCheck(this,10, null);"
+                                                                    styleClass="slds-input input-text"/>
+                                                </div>
+                                                <div class="slds-form-element__label" id="timeoutNoteMsg" style="color: red; display: none;">
+                                                    The minimum value is 1</div>
+                                            </div>
+                                        </apex:outputPanel>
+                                    </apex:outputPanel>
+                                    <br/>
+                                    
+                                </div>
+                            </div>
+                            <div class="slds-col slds-size_1-of-4" >
+                                <div class="slds-p-left_large">
+                                    <div class="slds-form-element__label">
+                                        Did your conversion job get stuck?
+                                    </div>
+                                    <div>
+                                        
+                                        <!-- TODO add confirm -->
+                                        <a href="#" class="slds-button slds-button--destructive  slds-m-right--small slds-m-top--medium" onClick="attachmentPrompt()">Reset Attachments conversion</a>
+                                        
+                                        <!-- TODO add confirm -->
+                                        <a href="#" class="slds-button slds-button--destructive  slds-m-right--small slds-m-top--medium" onClick="notePrompt()">Reset Notes conversion</a>
+                                        
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                            <div>
+                                    <div class="slds-form-element">
+                                        <apex:commandButton id="configButton" styleClass="slds-button slds-button--neutral" 
+                                                            action="{!changeConfigs}" value="Save"/>  
+                                    </div>
+                                </div>
+                        <!-- START Apex jobs panel -->
+                        <div class="slds-border_top slds-m-top--medium">
+                            
+                            <div class="slds-text-heading--small slds-m-top--small" >
+                                Apex Jobs
+                            </div>
+                            <div class="slds-text-title slds-m-bottom--medium slds-m-top--small">
+                                <p>
+                                    Displays Apex jobs related to Attachments to Files and Notes Conversion migrations.
+                                    <a href="{!apexjobsURL}"  target = "_blank">  
+                                        See all jobs.
+                                    </a>
+                                </p> 
+                            </div>
+                            
+                            
+                            <apex:outputPanel id="apexJobsPanel">
+                                <apex:dataTable value="{!apexJobs}"
+                                                var="e"
+                                                id="apexJobsTable"
+                                                headerClass="slds-text-title--caps"
+                                                style="line-height: 1.0;"
+                                                styleClass="tableStyle slds-table slds-table--bordered slds-table--cell-buffer">
+                                    
+                                    
+                                    <apex:column >
+                                        <apex:facet name="header">Apex Class Name</apex:facet>
+                                        <apex:outputText id="apexClassName" value="{!e.ApexClass.Name}" />
+                                    </apex:column>
+                                    
+                                    <apex:column >
+                                        <apex:facet name="header">Status</apex:facet>
+                                        <apex:outputText id="status" value="{!e.Status}" />
+                                    </apex:column> 
+                                    <apex:column >
+                                        <apex:facet name="header">Extended Status</apex:facet>
+                                        <apex:outputText id="extendedStatus" value="{!e.ExtendedStatus}" />
+                                    </apex:column> 
+                                    <apex:column >
+                                        <apex:facet name="header">Completed Date</apex:facet>
+                                        <apex:outputText value="{0, date, yyyy/MM/dd HH:mm:ss}">
+                                            <apex:param value="{!e.CompletedDate}" /> 
+                                        </apex:outputText>
+                                    </apex:column>
+                                    
+                                    <apex:column >
+                                        <apex:facet name="header">JobItems Processed</apex:facet>
+                                        <apex:outputText id="JobItemsProcessed" value="{!e.JobItemsProcessed}" />
+                                    </apex:column> 
+                                    
+                                    <apex:column >
+                                        <apex:facet name="header">Number Of Errors</apex:facet>
+                                        <apex:outputText id="NumberOfErrors" value="{!e.NumberOfErrors}" />
+                                    </apex:column>
+                                    <apex:column >
+                                        <apex:facet name="header">Total Job Items</apex:facet>
+                                        <apex:outputText id="TotalJobItems" value="{!e.TotalJobItems}" />
+                                    </apex:column>
+                                    
+                                </apex:dataTable>
+                                <apex:outputPanel rendered="{!EmptyApexJobs}">
+                                    <div class="slds-panel slds-align--absolute-center slds-text-body--regular slds-p-top--large slds-p-bottom--large">
+                                        No records
+                                    </div>
+                                    
+                                </apex:outputPanel>
+                                <div class="slds-align--absolute-center">
+                                    <apex:commandButton value="Previous" action="{!Previous}"
+                                                        rerender="apexJobsPanel"
+                                                        style="border-style: none; padding-left: 1rem; padding-right: 1rem;"
+                                                        styleClass="slds-button"
+                                                        disabled="{!DisablePrevious}" />
+                                    <apex:commandButton value="Next" action="{!Next}"
+                                                        style="border-style: none; padding-left: 1rem; padding-right: 1rem;"
+                                                        styleClass="slds-button"
+                                                        reRender="apexJobsPanel"
+                                                        disabled="{!DisableNext}" />
+                                    
+                                </div>
+                            </apex:outputPanel>
+                            
+                        </div><!-- END Apex jobs panel -->
+                        
+                        <!-- START Triggers panel -->
+                        <div class="slds-border_top slds-m-top--medium">
+                            
+                            <div class="slds-text-heading--small slds-m-top--small" >
+                                Triggers
+                            </div>
+                            <div class="slds-text-title slds-m-bottom--medium slds-m-top--small">
+                                <p>
+                                    Displays Apex triggers that may affect the conversion of legacy notes and attachments. Consider deactivating these triggers if you're seeing issues.
+                                    <a href="{!triggersURL}"  target = "_blank">  
+                                        See all triggers.
+                                    </a>
+                                </p> 
+                            </div>
+                            
+                            
+                            <apex:outputPanel id="triggersPanel">
+                                <apex:dataTable value="{!triggers}"
+                                                var="e"
+                                                id="triggersTable"
+                                                headerClass="slds-text-title--caps"
+                                                style="line-height: 1.0;"
+                                                styleClass="tableStyle slds-table slds-table--bordered slds-table--cell-buffer">
+                                    
+                                    
+                                    <apex:column >
+                                        <apex:facet name="header">Name</apex:facet>
+                                        <apex:outputText id="triggersName" value="{!e.Name}" />
+                                    </apex:column>
+                                    
+                                    <apex:column >
+                                        <apex:facet name="header">OBJECT</apex:facet>
+                                        <apex:outputText id="triggersTableEnumOrId" value="{!e.TableEnumOrId }" />
+                                    </apex:column> 
+                                    <apex:column >
+                                        <apex:facet name="header">Namespace Prefix</apex:facet>
+                                        <apex:outputText id="triggersNamespacePrefix" value="{!e.NamespacePrefix}" />
+                                    </apex:column> 
+                                    <apex:column >
+                                        <apex:facet name="header">Api Version</apex:facet>
+                                        <apex:outputText id="triggersApiVersion" value="{!e.ApiVersion}" />
+                                    </apex:column>
+                                    
+                                    <apex:column >
+                                        <apex:facet name="header">Status </apex:facet>
+                                        <apex:outputText value="{!e.Status }" />
+                                    </apex:column> 
+                                    
+                                    <apex:column >
+                                        <apex:facet name="header">Is Valid</apex:facet>
+                                        <apex:outputText value="{!e.IsValid}" />
+                                    </apex:column>
+                                    
+                                </apex:dataTable>
+                                <apex:outputPanel rendered="{!EmptyTriggers}">
+                                    <div class="slds-panel slds-align--absolute-center slds-text-body--regular slds-p-top--large slds-p-bottom--large">
+                                        No records
+                                    </div>
+                                    
+                                </apex:outputPanel>
+                                <div class="slds-align--absolute-center">
+                                    <apex:commandButton value="Previous" action="{!TriggersPrevious}"
+                                                        rerender="triggersPanel"
+                                                        style="border-style: none; padding-left: 1rem; padding-right: 1rem;"
+                                                        styleClass="slds-button"
+                                                        disabled="{!TriggersDisablePrevious}" />
+                                    <apex:commandButton value="Next" action="{!TriggersNext}"
+                                                        style="border-style: none; padding-left: 1rem; padding-right: 1rem;"
+                                                        styleClass="slds-button"
+                                                        reRender="triggersPanel"
+                                                        disabled="{!TriggersDisableNext}" />
+                                    
+                                </div>
+                            </apex:outputPanel>
+                            
+                        </div><!-- END Triggers panel -->
+                        
+                        <!-- START ScheduledJobs panel -->
+                        <div class="slds-border_top slds-m-top--medium">
+                            
+                            <div class="slds-text-heading--small slds-m-top--small" >
+                                Scheduled Jobs
+                            </div>
+                            <div class="slds-text-title slds-m-bottom--medium slds-m-top--small">
+                                <p>
+                                    Displays ScheduledJobs related to conversion of legacy notes and attachments scheduled actions.
+                                    <a href="{!scheduledJobsURL}"  target = "_blank">  
+                                        See all scheduled Jobs.
+                                    </a>
+                                </p> 
+                            </div>
+                            
+                            
+                            <apex:outputPanel id="scheduledJobsPanel">
+                                <apex:dataTable value="{!scheduledJobs}"
+                                                var="e"
+                                                id="scheduledJobsTable"
+                                                headerClass="slds-text-title--caps"
+                                                style="line-height: 1.0;"
+                                                styleClass="tableStyle slds-table slds-table--bordered slds-table--cell-buffer">
+                                    
+                                    
+                                    <apex:column >
+                                        <apex:facet name="header">Scheduled Job Name</apex:facet>
+                                        <apex:outputText id="scheduledJobsName" value="{!e.CronJobDetail.Name}" />
+                                    </apex:column>
+                                    <apex:column >
+                                        <apex:facet name="header">Next Fire Time</apex:facet>
+                                        <apex:outputText value="{0, date, yyyy/MM/dd HH:mm:ss}">
+                                            <apex:param value="{!e.NextFireTime}" /> 
+                                        </apex:outputText>
+                                    </apex:column>
+                                    <apex:column >
+                                        <apex:facet name="header">Created By</apex:facet>
+                                        <apex:outputText id="createdByName" value="{!e.CreatedBy.Name}" />
+                                    </apex:column>
+                                    
+                                </apex:dataTable>
+                                <apex:outputPanel rendered="{!EmptyScheduledJobs}">
+                                    <div class="slds-panel slds-align--absolute-center slds-text-body--regular slds-p-top--large slds-p-bottom--large">
+                                        No records
+                                    </div>
+                                    
+                                </apex:outputPanel>
+                                <div class="slds-align--absolute-center">
+                                    <apex:commandButton value="Previous" action="{!ScheduledJobsPrevious}"
+                                                        rerender="scheduledJobsPanel"
+                                                        style="border-style: none; padding-left: 1rem; padding-right: 1rem;"
+                                                        styleClass="slds-button"
+                                                        disabled="{!ScheduledJobsDisablePrevious}" />
+                                    <apex:commandButton value="Next" action="{!ScheduledJobsNext}"
+                                                        style="border-style: none; padding-left: 1rem; padding-right: 1rem;"
+                                                        styleClass="slds-button"
+                                                        reRender="scheduledJobsPanel"
+                                                        disabled="{!ScheduledJobsDisableNext}" />
+                                    
+                                </div>
+                            </apex:outputPanel>
+                            
+                        </div><!-- END ScheduledJobs panel -->
+                        
+                        <div class="slds-text-title slds-m-bottom--small slds-m-top--large">
+                            
+                            <p class="slds-m-top--large">
+                                Need help? Ask in our <a href="{!sucessComumunityGroupURL}"  target = "_blank">  Success Community Group.</a>
+                            </p>
+                            <p>
+                                Are you finding this tool useful? Let others know by writing a review on the <a href="{!appExchangeURL}"  target = "_blank">  AppExchange.</a>
+                            </p>
+                            
+                        </div>
+                        <div class="slds-text-title slds-text-align_right">
+                            Package Version {!version}
+                        </div>
+                        
+                    </apex:form>
+                    
+                </div>
+            </div>
+            
+        </div>
+        
+    </html>
+</apex:page>

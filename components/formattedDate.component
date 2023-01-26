@@ -1,0 +1,5 @@
+<apex:component access="global" controller="NMTFormattedDate"> 
+	<apex:attribute assignTo="{!fDateStart}" description="The DateTime value to be rendered as start date" name="date_value_start" type="Date"></apex:attribute>
+    <apex:attribute assignTo="{!fDateEnd}" description="The DateTime value to be rendered as end date" name="date_value_end" type="Date"></apex:attribute>
+	{!FormattedDate}
+</apex:component>

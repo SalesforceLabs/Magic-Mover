@@ -1,0 +1,1633 @@
+<!-- 
+With readOnly flag there are not query limits
+This page should be only used by admin to migrte public and private attachments
+-->
+<apex:page controller="ATFAttachmentsToFilesController" sidebar="false" title="Attachments to Files" id="bulkMigration" readOnly="true" docType="html-5.0">
+    <html xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+        <apex:includeScript value="{!URLFOR($Resource.NMTjs, 'js/jquery_3_1_1.min.js')}"/>
+        <apex:slds />
+        
+        <style>
+            .attachmentsToMigrateInputs{
+            background-color: #fff;
+            color: #16325c;
+            border: 1px solid #d8dde6;
+            border-radius: .25rem;
+            width: 100%;
+            transition: border .1s linear,background-color .1s linear; 
+            padding: 0 1rem 0 .75rem;
+            }
+            
+            .inProgressLabel{
+            background: #F7B64B !important;  
+            color: #00008B !important; 
+            font-weight: 900;
+            text-transform: none !important;
+            }
+            
+            .inProgressLabelDelete{
+            background: #F7B64B !important;  
+            color: #00008B !important; 
+            font-weight: 900;
+            text-transform: none !important;
+            }
+            
+            .dateFormat{
+            visibility:hidden;
+            display: none;
+            }
+            .locationError { color: red; font-weight: strong;}
+        </style>
+        
+        <script>
+        j$ = jQuery.noConflict(); 
+        
+        j$( document ).ready(function() {
+            console.log('started ');
+            showHideInprogressLabelUnmigratedObject();
+            showHideInprogressLabelMigratedObject();
+            j$("#bulkMigration\\:form\\:infoButton").click();
+            swapYears();
+        });
+        
+        //in case user click on the select all button we need to check every object or not depending in the case 
+        function selectUnselectAllObjects(){
+            var allObjectsSelected = document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:selectUnselectAllUnimgratedObjectsCheckbox').checked;
+            j$('#bulkMigration\\:form\\:unmigratedAttachmentsPerObjectTable tr').each(function(index) {
+                var objectCheckbox = document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:'+index+':objectCheckbox');
+                var disabled = j$('#bulkMigration\\:form\\:unmigratedAttachmentsPerObjectTable\\:'+index+'\\:objectCheckbox').is(":disabled");
+                if(objectCheckbox && !disabled){
+                    objectCheckbox.checked = allObjectsSelected; 
+                }
+            });
+            enableDisableMigrateButton();
+        }
+        
+        //mehtod to show textbox used for byId option and clean up the other options
+        function byIdShowPanel(){
+            document.getElementById('errorIdsMessage').innerHTML = '';
+            var byIdCheckbox = document.getElementById('byIdCheckbox').checked;
+            if(byIdCheckbox){
+                selectUnselectAllObjects()
+                document.getElementById('bulkMigration:form:byObjectIdPanel').style.display = 'none';
+                document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectPanel').style.display = 'none';
+                
+                document.getElementById('bulkMigration:form:byIdPanel').style.display = 'inline';
+                document.getElementById('bulkMigration:form:byIdToMigrate').focus();
+                unselectObjects();
+                document.getElementById('bulkMigration:form:byIdToMigrate').value = '';
+                document.getElementById('bulkMigration:form:byObjectIdToMigrate').value = '';
+            } else{
+                document.getElementById('bulkMigration:form:byIdPanel').style.display = 'none';
+            }
+            //  enableDisableMigrateButton();
+        }
+        
+        //used to unselect all object (refresh byObject view) when user change of migation option from byObject to byIdObject or byId
+        function unselectObjects(){
+            j$('#bulkMigration\\:form\\:unmigratedAttachmentsPerObjectTable tr').each(function(index) {
+                var objectCheckbox = document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:'+index+':objectCheckbox');
+                if(objectCheckbox){
+                    objectCheckbox.checked = false; 
+                }
+            });
+        }
+        
+        
+        //mehtod to show textbox used for byObjectId option and clean up the other options
+        function byObjectIdShowPanel(){
+            document.getElementById('errorIdsMessage').innerHTML = '';
+            var byObjectId = document.getElementById('byObjectIdCheckbox').checked;
+            if(byObjectId){
+                selectUnselectAllObjects();
+                document.getElementById('bulkMigration:form:byIdPanel').style.display = 'none';
+                document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectPanel').style.display = 'none';
+                document.getElementById('bulkMigration:form:byObjectIdPanel').style.display = 'inline';
+                document.getElementById('bulkMigration:form:byObjectIdToMigrate').focus();
+                unselectObjects();
+                document.getElementById('bulkMigration:form:byIdToMigrate').value = '';
+                document.getElementById('bulkMigration:form:byObjectIdToMigrate').value = '';
+            } else{
+                document.getElementById('bulkMigration:form:byObjectIdPanel').style.display = 'none';
+            }
+            // enableDisableMigrateButton();
+        }
+        
+        //mehtod to show table used for byObject option and clean up the other options
+        function byObjectShowPanel(){
+            document.getElementById('errorIdsMessage').innerHTML = '';
+            var byObject = document.getElementById('byObjectCheckbox').checked;
+            if(byObject){
+                document.getElementById('bulkMigration:form:byIdPanel').style.display = 'none';
+                document.getElementById('bulkMigration:form:byObjectIdPanel').style.display = 'none';
+                document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectPanel').style.display = 'inline';
+                unselectObjects();
+                document.getElementById('bulkMigration:form:byIdToMigrate').value = '';
+                document.getElementById('bulkMigration:form:byObjectIdToMigrate').value = '';
+            } else{
+                document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectPanel').style.display = 'none';
+            }
+            // enableDisableMigrateButton();
+            
+        }
+        
+        
+        function setFocusOnLoad() {}
+        
+        function setdatepicker(){
+            //swapYears();
+            document.getElementById('promptTimeLimit').style.display = 'none';
+            document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:selectUnselectAllUnimgratedObjectsCheckbox').checked = false; 
+            document.getElementById('bulkMigration:form:startDateIdOpp').readOnly = true;
+            document.getElementById('bulkMigration:form:endDateIdOpp').readOnly = true;
+            document.getElementById('bulkMigration:form:byIdToMigrate').value = '';
+            document.getElementById('bulkMigration:form:byObjectIdToMigrate').value = '';
+            document.getElementById('errorIdsMessage').innerHTML = '';
+            
+        }
+        
+        function isCompatible(){
+            var datefield=document.createElement("input");
+            datefield.setAttribute("type", "date");
+            if (datefield.type!="date"){
+                return false;        
+            }else{
+                return true;
+            }
+        }
+        
+        function help(){
+            j$('#helpMigrated').show();
+        }
+        
+        function helpClose(){
+            j$('#helpMigrated').hide();
+        }
+        
+        function helpUnmigrated(){
+            j$('#helpUnmigrated').show();
+        }
+        
+        function helpUnmigratedClose(){
+            j$('#helpUnmigrated').hide();
+        }
+        
+        function timeoutPrompt(timeout){
+            j$('#promptTimeLimit').show();
+            if(timeout){
+                
+                j$('#prompt-heading-div').removeClass("slds-theme--success");
+                j$('#prompt-heading-div').addClass("slds-theme--error");
+                j$("#"+'prompt-heading-div' + " > h2").html("Time Limit Exceeded");
+                j$("#"+'prompt-p-div' + " > p").html("Try a shorter date range to avoid timeout errors.");
+                
+                
+                
+            }else{
+                j$('#prompt-heading-div').addClass("slds-theme--success");
+                j$('#prompt-heading-div').removeClass("slds-theme--error");
+                j$("#"+'prompt-heading-div' + " > h2").html("Change Date Range");
+                j$("#"+'prompt-p-div' + " > p").html("");
+            }
+            j$( "#modalTimeOut" ).toggleClass( "slds-backdrop--close" );
+            j$( "#modalTimeOut" ).toggleClass( "slds-backdrop--open" );
+        }
+        
+        function closeTimeoutModal(){
+            j$('#promptTimeLimit').hide();
+            j$( "#modalTimeOut" ).toggleClass( "slds-backdrop--close" );
+            j$( "#modalTimeOut" ).toggleClass( "slds-backdrop--open" );
+        }
+        
+        function showHideInprogressLabelUnmigratedObject(){
+            document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:selectUnselectAllUnimgratedObjectsCheckbox').checked = false;            
+            var noRecords = document.getElementById('bulkMigration:form:noRecords');
+            var noFilter = false;
+            if(noRecords){
+                if(noRecords.value){                   
+                    document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:selectUnselectAllUnimgratedObjectsCheckbox').disabled = true;
+                    
+                }else{
+                    document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:selectUnselectAllUnimgratedObjectsCheckbox').disabled = false;
+                }
+            }
+            j$('#bulkMigration\\:form\\:unmigratedAttachmentsPerObjectTable tr').each(function(index) {
+                var status = document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:'+index+':unmigratedObjectInprogressInputHidden');
+                var inProgressLabel = document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:'+index+':unmigratedObjectInprogressLabel');    
+                if(status){
+                    status = status.value;
+                    if(inProgressLabel){
+                        if(status == 'true'){
+                            document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:'+index+':objectCheckbox').checked = true;
+                            document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:'+index+':objectCheckbox').disabled = true;
+                            document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:'+index+':attachmentsToMigrate').disabled = true;
+                            var input = document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:'+index+':unmigratedObjectQuantity');
+                            //inProgressLabel.style = "display: inline";
+                            inProgressLabel.style.display="inline";
+                            inProgressLabel.style.textAlign ="center";
+                            if(input){
+                                //    input.style = "display: inline"; 
+                                
+                                input.style.display="inline";
+                            }
+                            noFilter = true;
+                        }else{
+                            //  inProgressLabel.style = "display: none";
+                            inProgressLabel.style.display="none"; 
+                            
+                        }
+                    }
+                }
+                
+                
+            });
+            if(noFilter){
+                document.getElementById('bulkMigration:form:startDateIdOpp').onfocus = null;
+                document.getElementById('bulkMigration:form:endDateIdOpp').onfocus  = null;
+            } else {
+                document.getElementById('bulkMigration:form:startDateIdOpp').onfocus = function() {DatePicker.pickDate(true, 'bulkMigration:form:startDateIdOpp', false);};
+                document.getElementById('bulkMigration:form:endDateIdOpp').onfocus  = function() {DatePicker.pickDate(true, 'bulkMigration:form:endDateIdOpp', false);};
+            }
+            enableDisableMigrateButton();
+        }
+        
+        function showHideInprogressLabelMigratedObject(){
+            var noFilter = false;
+            j$('#bulkMigration\\:form\\:migratedAttachmentsPerObjectTable tr').each(function(index) {
+                var statusDelete = document.getElementById('bulkMigration:form:migratedAttachmentsPerObjectTable:'+index+':migratedObjectInprogressInputHidden');
+                var inProgressLabelDelete = document.getElementById('bulkMigration:form:migratedAttachmentsPerObjectTable:'+index+':migratedObjectInprogressLabel'); 
+                var iconDelete = document.getElementById('bulkMigration:form:migratedAttachmentsPerObjectTable:'+index+':trash'); 
+                if(statusDelete){
+                    statusDelete = statusDelete.value;
+                    if(inProgressLabelDelete){
+                        if(statusDelete == 'true'){
+                            console.info('inProgressLabelDelete:'+inProgressLabelDelete);
+                            
+                            // inProgressLabelDelete.style = "display: inline"; 
+                            inProgressLabelDelete.style.display="inline";
+                            iconDelete.style.display="none";
+                            // iconDelete.style = "display: none";
+                            noFilter = true;
+                        }else{
+                            inProgressLabelDelete.style.display="none";
+                            // inProgressLabelDelete.style = "display: none";   
+                            // iconDelete.style = "display: inline"; 
+                            var inProgressOtherTool = document.getElementById('inProgress').style.display;
+                            if(inProgressOtherTool == "inline"){
+                                iconDelete.style.display="none";
+                            } else {
+                                iconDelete.style.display="inline";
+                            }
+                        }
+                    }
+                }
+                
+                
+            }); 
+            
+        }
+        
+        function selectUnselectAllUnimgratedObjectsUnselect(){
+            document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:selectUnselectAllUnimgratedObjectsCheckbox').checked = false;                    
+            enableDisableMigrateButton();            
+        }        
+        
+        function calculateTotalAttachmentsToMigrate(){
+            var total = 0;
+            var totalScheduler = 0;
+            var SchedulerValue = document.getElementById('bulkMigration:form:schedulerSize');
+            var schedulerIsActive = document.getElementById('bulkMigration:form:schedulerIsActive');
+            j$('#bulkMigration\\:form\\:unmigratedAttachmentsPerObjectTable tr').each(function(index) {
+                var input = document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:'+index+':attachmentsToMigrate');
+                var quantity = j$('#bulkMigration\\:form\\:unmigratedAttachmentsPerObjectTable\\:'+index+'\\:objectQuantity').html();
+                var checked = j$('#bulkMigration\\:form\\:unmigratedAttachmentsPerObjectTable\\:'+index+'\\:objectCheckbox').is(":checked");
+                var inputToMigrate = document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:'+index+':unmigratedObjectQuantity');
+                var disableTrue = document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:'+index+':objectCheckbox');
+                
+                if(checked && input && quantity && disableTrue){
+                    if(disableTrue.disabled === false){
+                        //+ + to convert to number
+                        if(Number(input.value) >  Number(quantity)){
+                            input.value = quantity;
+                            total = total + Number(quantity);
+                            if(Number(SchedulerValue.value) < Number(quantity)){
+                                totalScheduler = totalScheduler + Number(SchedulerValue.value);
+                            } else {
+                                totalScheduler = totalScheduler + Number(quantity);  
+                            }
+                            
+                        }else{
+                            if(Number(input.value) < 0 || !j$.isNumeric(Number(input.value))){
+                                input.value = 0;
+                                total = total + 0;
+                                totalScheduler = totalScheduler + 0;  
+                            }else{
+                                total = total + Number(input.value);
+                                if(Number(SchedulerValue.value) < Number(input.value)){
+                                    totalScheduler = totalScheduler + Number(SchedulerValue.value);
+                                } else {
+                                    totalScheduler = totalScheduler + Number(input.value);
+                                }
+                            }
+                        }
+                        if(input.value > 0){
+                            input.value = parseInt(input.value, 10);
+                        }
+                        
+                    }
+                }
+                
+                if(inputToMigrate && disableTrue){
+                    if(disableTrue.disabled === false){
+                        inputToMigrate.value = input.value;
+                        inputToMigrate.innerHTML = input.value;
+                    }
+                }
+            });
+            document.getElementById("totalAttachmentsToMigrate").innerHTML = total;
+            if(schedulerIsActive.value == 'true'){
+                if(totalScheduler >= 100000){
+                    document.getElementById("schedulerTotal").innerHTML = totalScheduler;
+                    document.getElementById('contentVersionMsgScheduler').style.display = "inline";
+                    document.getElementById('contentVersionMsgScheduler').style.color= "#C23934";
+                } else {
+                    document.getElementById("schedulerTotal").innerHTML = totalScheduler;
+                    document.getElementById('contentVersionMsgScheduler').style.color= "#222";
+                    document.getElementById('contentVersionMsgScheduler').style.display = "inline"; 
+                }
+            } else {
+                document.getElementById('contentVersionMsgScheduler').style.display = "none";                
+            }
+            
+            if(total >= 100000){
+                document.getElementById('contentVersionMsg').style.display = "inline";
+                document.getElementById('contentVersionMsg').style.color= "#C23934";
+                //  document.getElementById('contentVersionMsg').style="display: inline; color: #C23934;";
+                document.getElementById('amountToMigrate').style.color = "#C23934";
+                // document.getElementById('amountToMigrate').style="color: #C23934;";
+                
+            }else{
+                document.getElementById('contentVersionMsg').style.display = "none";
+                // document.getElementById('contentVersionMsg').style="display: none";
+                document.getElementById('contentVersionMsg').style.color= "#222";
+                document.getElementById('amountToMigrate').style.color = "#222";
+                // document.getElementById('amountToMigrate').style="color: #222;";
+                
+            }
+            document.getElementById("totalSpan").innerHTML = total;    
+            if(Number(document.getElementById("totalAttachmentsToMigrate").innerHTML) === 0){
+                document.getElementById('migrateButton').disabled = true; 
+            }else{
+                var inProgressOtherTool = document.getElementById('inProgress').style.display;
+                if(inProgressOtherTool == "inline"){
+                    document.getElementById('migrateButton').disabled = true;
+                } else {
+                    document.getElementById('migrateButton').disabled = false; 
+                }
+            }
+        }
+        
+        function selectUnselectAllUnimgratedObjects(){
+            var allUnmigratedObjectsSelected = document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:selectUnselectAllUnimgratedObjectsCheckbox').checked;
+            j$('#bulkMigration\\:form\\:unmigratedAttachmentsPerObjectTable tr').each(function(index) {
+                var objectCheckbox = document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:'+index+':objectCheckbox');
+                var disabled = j$('#bulkMigration\\:form\\:unmigratedAttachmentsPerObjectTable\\:'+index+'\\:objectCheckbox').is(":disabled");
+                if(objectCheckbox && !disabled){
+                    objectCheckbox.checked = allUnmigratedObjectsSelected; 
+                }
+            });
+            enableDisableMigrateButton();
+            
+        }
+        
+        function refreshTextbox(){
+            document.getElementById('bulkMigration:form:byIdToMigrate').value = '';
+            document.getElementById('bulkMigration:form:byObjectIdToMigrate').value = '';
+            document.getElementById('errorIdsMessage').innerHTML = '';
+            
+            showHideInprogressLabelUnmigratedObject();
+        }
+        
+        
+        /**
+         * When the user checks any checkbox of the unmigrated attachments table
+         * we see if we can enable the migrate button and display the attachments ti migrate input
+         */ 
+        function enableDisableMigrateButton(){  
+            var inProgressOtherTool = document.getElementById('inProgress').style.display;
+            if(inProgressOtherTool == "inline"){
+                var enableMigrateButton = false;
+                document.getElementById('bulkMigration:form:infoButton').disabled = true;
+                document.getElementById('bulkMigration:form:optionOrderBy:0').disabled = true;
+                document.getElementById('bulkMigration:form:optionOrderBy:1').disabled = true;
+            } else {
+                var byObject = document.getElementById('byObjectCheckbox').checked;
+                if(byObject){
+                    document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectPanel').style.display = 'inline';
+                    document.getElementById('byIdCheckbox').disabled = false;
+                    document.getElementById('byObjectIdCheckbox').disabled = false;
+                    document.getElementById('byObjectCheckbox').disabled = false;
+                    document.getElementById('bulkMigration:form:infoButton').disabled = false; 
+                    document.getElementById('bulkMigration:form:optionOrderBy:0').disabled = false;
+                    document.getElementById('bulkMigration:form:optionOrderBy:1').disabled = false;
+                } else {
+                    document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectPanel').style.display = 'none';
+                }
+                
+                
+                var inProgressId = document.getElementById('bulkMigration:form:byObjectIdToMigrate').disabled;
+                
+                if(inProgressId && !byObject){
+                    document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectPanel').style.display = 'none';
+                    document.getElementById('byIdCheckbox').disabled = true;
+                    document.getElementById('byObjectIdCheckbox').disabled = true;
+                    document.getElementById('byObjectCheckbox').disabled = true;
+                    document.getElementById('bulkMigration:form:infoButton').disabled = true;
+                    document.getElementById('bulkMigration:form:optionOrderBy:0').disabled = true;
+                    document.getElementById('bulkMigration:form:optionOrderBy:1').disabled = true;
+                    var byIdCheckbox = document.getElementById('byIdCheckbox').checked;
+                    if(byIdCheckbox){
+                        
+                        document.getElementById('bulkMigration:form:byIdInprogressLabel').style.display = 'inline';
+                        
+                    } 
+                    var byObjectId = document.getElementById('byObjectIdCheckbox').checked;
+                    if(byObjectId){
+                        document.getElementById('bulkMigration:form:byObjectIdInprogressLabel').style.display = 'inline';
+                        
+                    }
+                    if(!byIdCheckbox && !byObjectId){
+                        document.getElementById('bulkMigration:form:byIdsInprogressLabel').style.display = 'inline';
+                    }
+                    
+                    
+                } else {
+                    var inProgress = document.getElementById('bulkMigration:form:byIdToMigrate').disabled;
+                    document.getElementById('bulkMigration:form:byIdInprogressLabel').style.display = 'none';
+                    document.getElementById('bulkMigration:form:byObjectIdInprogressLabel').style.display = 'none';
+                    document.getElementById('bulkMigration:form:byIdsInprogressLabel').style.display = 'none';
+                    
+                    if(inProgress && !byObject){
+                        document.getElementById('byIdCheckbox').disabled = true;
+                        document.getElementById('byObjectIdCheckbox').disabled = true;
+                        document.getElementById('bulkMigration:form:infoButton').disabled = true;
+                        document.getElementById('bulkMigration:form:optionOrderBy:0').disabled = true;
+                        document.getElementById('bulkMigration:form:optionOrderBy:1').disabled = true;
+                        document.getElementById('byObjectCheckbox').disabled = false;
+                        document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectPanel').style.display = 'inline';
+                    } else {
+                        document.getElementById('byIdCheckbox').disabled = false;
+                        document.getElementById('byObjectIdCheckbox').disabled = false;
+                        if(!byObject){
+                            document.getElementById('bulkMigration:form:infoButton').disabled = false;
+                            document.getElementById('bulkMigration:form:optionOrderBy:0').disabled = false;
+                            document.getElementById('bulkMigration:form:optionOrderBy:1').disabled = false;
+                        }
+                        document.getElementById('byObjectCheckbox').disabled = false;
+                        
+                        var byIdCheckbox = document.getElementById('byIdCheckbox').checked;
+                        if(byIdCheckbox){
+                            document.getElementById('bulkMigration:form:byIdPanel').style.display = 'inline';
+                        } 
+                        var byObjectId = document.getElementById('byObjectIdCheckbox').checked;
+                        if(byObjectId){
+                            document.getElementById('bulkMigration:form:byObjectIdPanel').style.display = 'inline';
+                        }
+                    }
+                    
+                    var enableMigrateButton = false;
+                    var allCheckbox = true;
+                    var byIdCheckbox = document.getElementById('byIdCheckbox').checked;
+                    var byIdValue= j$('#bulkMigration\\:form\\:byIdToMigrate').val();
+                    var byObjectIdCheckbox = document.getElementById('byObjectIdCheckbox').checked;
+                    var byObjectIdValue= j$('#bulkMigration\\:form\\:byObjectIdToMigrate').val();
+                    var byObjectCheckbox = document.getElementById('byObjectCheckbox').checked;
+                    
+                    if(byIdCheckbox &&  byIdValue.length > 0 || byObjectIdCheckbox && byObjectIdValue.length > 0){
+                        if(byIdValue.length > 379 || byObjectIdValue.length > 379){
+                            j$('#bulkMigration\\:form\\:byIdToMigrate').val(byIdValue.substring(0, 379));
+                            j$('#bulkMigration\\:form\\:byObjectIdToMigrate').val(byObjectIdValue.substring(0, 379));
+                        }
+                        document.getElementById('migrateButton').disabled = false; 
+                    } else {
+                        document.getElementById('migrateButton').disabled = true;
+                    }
+                    if(byObjectCheckbox){
+                        var max = 100000;
+                        var enableMigrateButton = false;
+                        var allCheckbox = true;
+                        j$('#bulkMigration\\:form\\:unmigratedAttachmentsPerObjectTable tr').each(function(index) {
+                            var checked = j$('#bulkMigration\\:form\\:unmigratedAttachmentsPerObjectTable\\:'+index+'\\:objectCheckbox').is(":checked");
+                            //in progress object migration are disables, because of that we have to ask for disabled property of the checkbox                      
+                            var disabled = j$('#bulkMigration\\:form\\:unmigratedAttachmentsPerObjectTable\\:'+index+'\\:objectCheckbox').is(":disabled");
+                            if(checked && !disabled){
+                                enableMigrateButton = true;
+                            }
+                            var inProgressObject = document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:'+index+':unmigratedObjectInprogressLabel');
+                            if(inProgressObject && inProgressObject.style.display == "inline"){
+                                console.log("checked && disabled");
+                                document.getElementById('bulkMigration:form:infoButton').disabled = true;
+                                document.getElementById('bulkMigration:form:optionOrderBy:0').disabled = true;
+                                document.getElementById('bulkMigration:form:optionOrderBy:1').disabled = true;
+                                document.getElementById('byIdCheckbox').disabled = true;
+                                document.getElementById('byObjectIdCheckbox').disabled = true;
+                            }
+                            var attachmentsToMigrateInput = document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:'+index+':attachmentsToMigrate');                
+                            if(attachmentsToMigrateInput){
+                                var quantity1 = j$('#bulkMigration\\:form\\:unmigratedAttachmentsPerObjectTable\\:'+index+'\\:objectQuantity').html();
+                                if(quantity1){
+                                    if(!checked){
+                                        if(Number(quantity1) < max){
+                                            attachmentsToMigrateInput.value = Number(quantity1);
+                                        }else{
+                                            attachmentsToMigrateInput.value = max;
+                                        }
+                                    }
+                                }
+                                if(checked && !disabled){
+                                    attachmentsToMigrateInput.style.display="inline";
+                                    
+                                }else{
+                                    attachmentsToMigrateInput.style.display="none";
+                                    if(!disabled){
+                                        allCheckbox = false;
+                                    }
+                                }
+                            }
+                            
+                        });
+                        
+                        document.getElementById('migrateButton').disabled = !enableMigrateButton;
+                        
+                        var noRecords = document.getElementById('bulkMigration:form:noRecords');
+                        if(noRecords){
+                            if(noRecords.value){                   
+                                allCheckbox = false;
+                                
+                            }else{
+                                allCheckbox = true;
+                            }
+                        }
+                        document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:selectUnselectAllUnimgratedObjectsCheckbox').checked = allCheckbox; 
+                        calculateTotalAttachmentsToMigrate();
+                    }
+                    
+                }
+                
+            }
+        }
+        
+        function onMigrateClick(){
+            j$('.migrateButton')[0].disabled = true;
+            j$('.migrateButton')[0].style="cursor: not-allowed";
+            j$('.migrateButton')[0].value="Wait...";
+        }
+        
+        function onMigrateComplete(){
+            j$('.migrateButton')[0].disabled = false;
+            j$('.migrateButton')[0].style="cursor: allowed";
+            j$('.migrateButton')[0].value="Migrate";
+        }     
+        
+        function deletePrompt(objectname){
+            j$('#promptState').show();
+            j$('#objectName').html(objectname);
+            j$('#bulkMigration\\:form\\:objectToDelete').val(objectname);
+            j$( "#modal" ).toggleClass( "slds-backdrop--close" );
+            j$( "#modal" ).toggleClass( "slds-backdrop--open" );
+        }
+        
+        //mehtod used to check what type of migration user is trying to do and open the correct prompt 
+        function migrationPrompt(){
+            var byIdCheckbox = document.getElementById('byIdCheckbox').checked;
+            var byObjectIdCheckbox = document.getElementById('byObjectIdCheckbox').checked;
+            var byObjectCheckbox = document.getElementById('byObjectCheckbox').checked;
+            if(byIdCheckbox){
+                j$('#promptMigrateById').show();
+                j$( "#modalMigrateById" ).toggleClass( "slds-backdrop--close" );
+                j$( "#modalMigrateById" ).toggleClass( "slds-backdrop--open" );
+            }
+            if(byObjectIdCheckbox){
+                j$('#promptMigrateByObjectId').show();
+                j$( "#modalMigrateByObjectId" ).toggleClass( "slds-backdrop--close" );
+                j$( "#modalMigrateByObjectId" ).toggleClass( "slds-backdrop--open" );
+            }
+            if(byObjectCheckbox){
+                j$('#promptMigrateByObject').show();
+                j$( "#modalMigrateByObject" ).toggleClass( "slds-backdrop--close" );
+                j$( "#modalMigrateByObject" ).toggleClass( "slds-backdrop--open" );
+            }
+            
+            
+        }
+        
+        
+        function errorLimitPrompt(){
+            j$('#errorLimitMsg').show();
+        }
+        
+        function closeErrorModal(){
+            j$('#errorLimitMsg').hide();
+        }
+        
+        function errorLimitPromptMigrate(){
+            j$('#errorLimitMsgMigrate').show();
+        }
+        
+        function closeErrorModalMigrate(){
+            j$('#errorLimitMsgMigrate').hide();
+        }
+        
+        function closeModal(){
+            j$('#promptState').hide();
+            j$( "#modal" ).toggleClass( "slds-backdrop--close" );
+            j$( "#modal" ).toggleClass( "slds-backdrop--open" );
+        }
+        
+        //mehtod used to check what type of migration user did and close the correct prompt 
+        function closeMigrateModal(){
+            var byIdCheckbox = document.getElementById('byIdCheckbox').checked;
+            var byObjectIdCheckbox = document.getElementById('byObjectIdCheckbox').checked;
+            var byObjectCheckbox = document.getElementById('byObjectCheckbox').checked;
+            if(byIdCheckbox){
+                j$('#promptMigrateById').hide();
+                j$( "#modalMigrateById" ).toggleClass( "slds-backdrop--close" );
+                j$( "#modalMigrateById" ).toggleClass( "slds-backdrop--open" );
+            }
+            if(byObjectIdCheckbox){
+                j$('#promptMigrateByObjectId').hide();
+                j$( "#modalMigrateByObjectId" ).toggleClass( "slds-backdrop--close" );
+                j$( "#modalMigrateByObjectId" ).toggleClass( "slds-backdrop--open" );
+            }
+            if(byObjectCheckbox){
+                j$('#promptMigrateByObject').hide();
+                j$( "#modalMigrateByObject" ).toggleClass( "slds-backdrop--close" );
+                j$( "#modalMigrateByObject" ).toggleClass( "slds-backdrop--open" );
+            }
+            
+        }
+        
+        
+        function deleteMigratedByObjectNameRemote(){
+            
+            document.getElementById('bulkMigration:form:infoButton').disabled = true; 
+            document.getElementById('bulkMigration:form:optionOrderBy:0').disabled = true;
+            document.getElementById('bulkMigration:form:optionOrderBy:1').disabled = true;
+            //document.getElementById('bulkMigration:form:startDateId').disabled = true;  
+            //document.getElementById('bulkMigration:form:endDateId').disabled = true; 
+            document.getElementById('bulkMigration:form:startDateIdOpp').onfocus = null;
+            document.getElementById('bulkMigration:form:endDateIdOpp').onfocus  = null;
+            var objectNameDelete = j$('#bulkMigration\\:form\\:objectToDelete').val();
+            sDate = document.getElementById('bulkMigration:form:sDate').innerHTML;
+            eDate = document.getElementById('bulkMigration:form:eDate').innerHTML;
+            var startDate = new Date(sDate.replace(" - ", "/").replace(" - ", "/"));
+            var endDate = new Date(eDate.replace(" - ", "/").replace(" - ", "/"));
+            j$('#bulkMigration\\:form\\:migratedAttachmentsPerObjectTable tr').each(function(index) {
+                var objectDelete = j$('#bulkMigration\\:form\\:migratedAttachmentsPerObjectTable\\:'+index+'\\:objectName').html();
+                
+                //alert(objectDelete + ' ' + objectNameDelete)
+                if(objectDelete && objectDelete == objectNameDelete){
+                    //bulkMigration:form:migratedAttachmentsPerObjectTable:0:migratedObjectInprogressInputHidden
+                    var statusDelete = document.getElementById('bulkMigration:form:migratedAttachmentsPerObjectTable:'+index+':migratedObjectInprogressInputHidden');
+                    
+                    if(statusDelete){
+                        statusDelete.value = 'true';
+                    }
+                }
+                
+            });
+            var checkedOption = j$('#bulkMigration\\:form\\:optionOrderBy\\:0').is(":checked");
+            Visualforce.remoting.Manager.invokeAction(
+                '{!$RemoteAction.ATFAttachmentsToFilesController.deleteMigratedByObjectNameRemote}',
+                objectNameDelete, startDate, endDate, checkedOption,
+                function(result, event){
+                    if (event.status) {
+                        //reload the page to see the in progress labels
+                        //location.reload();
+                        showHideInprogressLabelMigratedObject();   
+                        closeModal();
+                        
+                        j$('#bulkMigration\\:form\\:migrateButtonRefrsh').click();
+                    } else if (event.type === 'exception') {
+                        closeModal();
+                        console.error('Error running the migration, exception: '+event.where);
+                        if(event.message.includes( 'STORAGE_LIMIT_EXCEEDED' )){
+                            errorLimitPrompt();
+                        }
+                        if(event.message.includes( 'Other Tool In Progress' )||event.message.includes( 'You don’t have permission' )){
+                            location.reload(true);
+                        }
+                    } else {
+                        console.error('Error running the migration, message: '+event.message);
+                    }
+                }, 
+                {escape: true}
+            );
+            
+            
+        }
+        
+        function runMigrationRemote(migrationType){
+            document.getElementById('errorIdsMessage').innerHTML = '';
+            closeMigrateModal();
+            var objects = "";
+            var byIdCheckbox = document.getElementById('byIdCheckbox').checked;
+            var byObjectIdCheckbox = document.getElementById('byObjectIdCheckbox').checked;
+            var byObjectCheckbox = document.getElementById('byObjectCheckbox').checked;
+            
+            if(byIdCheckbox){
+                objects = document.getElementById('bulkMigration:form:byIdToMigrate').value.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            }
+            if(byObjectIdCheckbox){
+                objects = document.getElementById('bulkMigration:form:byObjectIdToMigrate').value.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            }
+            sDate = document.getElementById('bulkMigration:form:sDate').innerHTML;
+            eDate = document.getElementById('bulkMigration:form:eDate').innerHTML;
+            var startDate = new Date(sDate.replace(" - ", "/").replace(" - ", "/"));
+            var endDate = new Date(eDate.replace(" - ", "/").replace(" - ", "/"));
+            
+            document.getElementById('bulkMigration:form:infoButton').disabled = true;
+            document.getElementById('bulkMigration:form:optionOrderBy:0').disabled = true;
+            document.getElementById('bulkMigration:form:optionOrderBy:1').disabled = true;
+            document.getElementById('bulkMigration:form:startDateIdOpp').onfocus = null;
+            document.getElementById('bulkMigration:form:endDateIdOpp').onfocus  = null;
+            
+            if(byObjectCheckbox){
+                j$('#bulkMigration\\:form\\:unmigratedAttachmentsPerObjectTable tr').each(function(index) {
+                    var checked = j$('#bulkMigration\\:form\\:unmigratedAttachmentsPerObjectTable\\:'+index+'\\:objectCheckbox').is(":checked");
+                    var isDisable = j$('#bulkMigration\\:form\\:unmigratedAttachmentsPerObjectTable\\:'+index+'\\:objectCheckbox').is(":disabled");
+                    if(checked && !isDisable){                    
+                        var objectName = j$('#bulkMigration\\:form\\:unmigratedAttachmentsPerObjectTable\\:'+index+'\\:objectName').html();
+                        var quantity = j$('#bulkMigration\\:form\\:unmigratedAttachmentsPerObjectTable\\:'+index+'\\:attachmentsToMigrate').val();
+                        if(quantity !== '' && quantity !== 0){
+                            objects+=objectName+','+quantity+'|';
+                            //var objectName = j$('#bulkMigration\\:form\\:unmigratedAttachmentsPerObjectTable\\:'+index+'\\:objectName').val();
+                            var status = document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:'+index+':unmigratedObjectInprogressInputHidden');
+                            if(status){
+                                status.value = 'true';
+                            }
+                        }else{
+                            document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectTable:'+index+':objectCheckbox').checked = false;
+                        }
+                        
+                    }
+                    
+                });
+                
+            }
+            var checkedOption = j$('#bulkMigration\\:form\\:optionOrderBy\\:0').is(":checked");
+            
+            
+            Visualforce.remoting.Manager.invokeAction(
+                '{!$RemoteAction.ATFAttachmentsToFilesController.runMigrationRemote}',
+                objects, migrationType, startDate, endDate, checkedOption,
+                function(result, event){
+                    if (event.status) {
+                        //reload the page to see the in progress labels
+                        //location.reload();
+                        
+                        document.getElementById('bulkMigration:form:byIdToMigrate').value = '';
+                        document.getElementById('bulkMigration:form:byObjectIdToMigrate').value = '';
+                        document.getElementById('bulkMigration:form:startDateIdOpp').onfocus = null;
+                        document.getElementById('bulkMigration:form:endDateIdOpp').onfocus  = null;
+                        document.getElementById('migrateButton').disabled = true;
+                        showHideInprogressLabelUnmigratedObject();
+                        //closeMigrateModal();
+                        selectUnselectAllUnimgratedObjectsUnselect();
+                        j$('#bulkMigration\\:form\\:migrateButtonRefrsh').click();
+                    } else if (event.type === 'exception') {                        
+                        closeMigrateModal();
+                        console.error('Error running the migration, exception: '+event.where);
+                        if(event.message.includes( 'STORAGE_LIMIT_EXCEEDED' )){
+                            errorLimitPromptMigrate();
+                        }
+                        if(event.message.includes( 'Other Tool In Progress' )||event.message.includes( 'You don’t have permission' )){
+                            location.reload(true);
+                        }
+                        if(event.message.includes( 'ID' )){
+                            if(byIdCheckbox){
+                                j$( "#modalMigrateById" ).toggleClass( "slds-backdrop--open" );
+                            }else{
+                                j$( "#modalMigrateByObjectId" ).toggleClass( "slds-backdrop--open" );
+                            }
+                            document.getElementById('errorIdsMessage').style.color= "#C23934";
+                            document.getElementById('errorIdsMessage').innerHTML = event.message;
+                            document.getElementById('runMigrationButtonById').style.pointerEvents = 'auto';
+                            document.getElementById('runMigrationButtonByObjectId').style.pointerEvents = 'auto';
+                            document.getElementById('bulkMigration:form:startDateIdOpp').onfocus = function() {DatePicker.pickDate(true, 'bulkMigration:form:startDateIdOpp', false);};
+                            document.getElementById('bulkMigration:form:endDateIdOpp').onfocus  = function() {DatePicker.pickDate(true, 'bulkMigration:form:endDateIdOpp', false);};
+                            document.getElementById('bulkMigration:form:infoButton').disabled = false;
+                            document.getElementById('bulkMigration:form:optionOrderBy:0').disabled = false;
+                            document.getElementById('bulkMigration:form:optionOrderBy:1').disabled = false;
+                            document.getElementById('migrateButton').disabled = true;
+                        }
+                        if(event.message.includes( 'busy' )){
+                            document.getElementById('promptOtherProcess').style.display = 'inline';
+                            document.getElementById('messageOtherProcess').innerHTML = event.message;
+                            document.getElementById('byIdCheckbox').disabled = true;
+                            document.getElementById('byObjectIdCheckbox').disabled = true;
+                            document.getElementById('byObjectCheckbox').disabled = true;
+                            document.getElementById('migrateButton').disabled = true;
+                            document.getElementById('bulkMigration:form:infoButton').disabled = true;
+                            document.getElementById('bulkMigration:form:optionOrderBy:0').disabled = true;
+                            document.getElementById('bulkMigration:form:optionOrderBy:1').disabled = true;
+                            document.getElementById('bulkMigration:form:startDateIdOpp').onfocus = null;
+                            document.getElementById('bulkMigration:form:endDateIdOpp').onfocus  = null;
+                            document.getElementById('bulkMigration:form:unmigratedAttachmentsPerObjectPanel').style.display = 'none';
+                            document.getElementById('bulkMigration:form:byObjectIdPanel').style.display = 'none';
+                            document.getElementById('bulkMigration:form:byIdPanel').style.display = 'none';
+                            document.getElementById('bulkMigration:form:migratedAttachmentsPerObjectPanel').style.display = 'none';
+                            document.getElementById('bulkMigration:form:quantityAttachmentsPanel').style.display = 'none';
+                            document.getElementById('bulkMigration:form:inprogressLabel').style.display = 'inline';
+                            document.getElementById('bulkMigration:form:inprogressLabel').value = 'In Progress';
+                            // showHideInprogressLabelUnmigratedObject();
+                            // selectUnselectAllUnimgratedObjectsUnselect();
+                            
+                        }
+                        
+                        
+                        j$('#modalMigrateByObject').hide();
+                        j$('#modalMigrateById').hide();
+                        j$('#modalMigrateByObjectId').hide();
+                    } else {
+                        console.error('Error running the migration, message: '+event.message);
+                    }
+                }, 
+                {escape: true}
+            );
+            
+            
+        } 
+        
+        function verifyCountResult(){
+            var value = document.getElementById('bulkMigration:form:checkCountId').value;
+            
+            if(value == 'false'){
+                timeoutPrompt(true);
+            }
+        }
+        
+        function valueCheck(input) {
+            if(input.value.length < 10){
+                document.getElementById('bulkMigration:form:infoButton').disabled = true;
+            }
+            if(input.value.length > 10){
+                input.value = input.value.substring(0, 10);
+            }
+        }
+        
+        //for calendar component
+        var arYears = getYears();
+        
+        function swapYears(){
+            
+            if(document.getElementById('calYearPicker') != null) {
+                var select = document.getElementById('calYearPicker');
+                var curValue = select.value; 
+                var parentx = select.parentNode;
+                parentx.removeChild(select);
+                select = document.createElement('select');
+                select.size = 1;
+                select.id = 'calYearPicker';
+                select.name = 'calYearPicker';
+                parentx.appendChild(select);
+            }
+            if(select != null) {
+                for(x=0;x<25;x++) {     
+                    select.options[x] = new Option(arYears[x], arYears[x], false, false);
+                }
+            }
+        }
+        function getYears() {
+            var out = [];
+            // generate dates for the last 100 years
+            var currentTime = new Date()
+            var year = currentTime.getFullYear()
+            try {
+                for(x=0;x<25;x++) {
+                    out[x] = x+year-24;
+                }   
+                
+            } catch(error) {
+                alert(error);       
+            }   
+            return out;
+        }
+        
+        </script>
+        <!-- IF PERMISSION ISSUE -->
+        <div class="{!permissionIssue}">
+            <c:NAMPermissionIssue ></c:NAMPermissionIssue>
+        </div>
+        
+        <!-- REQUIRED SLDS WRAPPER -->
+        <div class="slds-grid {!notPermissionIssue}">
+            <div class="slds-notify_container">
+                <div class="slds-notify slds-notify--alert slds-theme--error slds-theme--alert-texture slds-hide" id="errorLimitMsg" role="alert">
+                    <button class="slds-button slds-notify__close slds-button--icon-inverse" title="Close" onClick="closeErrorModal()">
+                        <span class="slds-assistive-text">Close</span>
+                    </button>
+                    <span class="slds-assistive-text">Error</span>
+                    <h2>
+                        <svg class="slds-icon slds-icon--small slds-m-right--x-small" aria-hidden="true">
+                        </svg>Your org has reached its file storage limit. To delete attachments, free up space.</h2>
+                </div>
+            </div>
+            <div class="slds-notify_container">
+                <div class="slds-notify slds-notify--alert slds-theme--error slds-theme--alert-texture slds-hide" id="errorLimitMsgMigrate" role="alert">
+                    <button class="slds-button slds-notify__close slds-button--icon-inverse" title="Close" onClick="closeErrorModalMigrate()">
+                        <span class="slds-assistive-text">Close</span>
+                    </button>
+                    <span class="slds-assistive-text">Error</span>
+                    <h2>
+                        <svg class="slds-icon slds-icon--small slds-m-right--x-small" aria-hidden="true">
+                        </svg>Your org has reached its file storage limit. To convert attachments to files, free up space.</h2>
+                </div>
+            </div>            
+            <apex:form id="form" style="width: 100%">
+                
+                <apex:pageMessages id="messages"/>
+                <div class="slds-size--1-of-1  slds-m-top--small" id="migration">
+                    <!-- START  other process already started dialog -->
+                    <div class="demo-only" id="promptOtherProcess" style="height: 4rem; display: none">
+                        <div class="slds-notify_container slds-is-relative">
+                            <div class="slds-notify slds-notify_toast slds-theme_info" role="alert">
+                                <div class="slds-notify__content">
+                                    <h2 class="slds-text-heading_small" id="messageOtherProcess"></h2>
+                                </div> <!--
+<button class="slds-button slds-button_icon slds-notify__close slds-button_icon-inverse" title="Close" >
+<span class="slds-icon_container slds-icon-standard-article"
+style="padding: 5px; margin-top: -2px;">
+<span class="slds-icon slds-icon-text-warning slds-icon_x-small" 
+aria-hidden="true">
+<img src="{!URLFOR($Asset.SLDS, 'assets/icons/utility/warning_60.png')}"  
+class="slds-icon_x-small"/>
+</span>
+
+</span>
+</button> -->
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END other process already started dialog --> 
+                    <!-- START  new time limit dialog -->
+                    <div class="demo-only" id="promptTimeLimit" style="height: 4rem; display: none">
+                        <div class="slds-notify_container slds-is-relative">
+                            <div class="slds-notify slds-notify_toast slds-theme--error slds-m-bottom--medium" role="alert">
+                                <div class="slds-notify__content">
+                                    <h2 class="slds-text-heading_small">Too many items for conversion.  Enter a smaller date range and try converting again.</h2>
+                                </div> <!--
+<button class="slds-button slds-button_icon slds-notify__close slds-button_icon-inverse" title="Close" >
+<span class="slds-icon_container slds-icon-standard-article"
+style="padding: 5px; margin-top: -2px;">
+<span class="slds-icon slds-icon-text-warning slds-icon_x-small" 
+aria-hidden="true">
+<img src="{!URLFOR($Asset.SLDS, 'assets/icons/utility/warning_60.png')}"  
+class="slds-icon_x-small"/>
+</span>
+
+</span>
+</button> -->
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END new time limit dialog -->  
+                    
+                    <div class="slds-grid slds-wrap slds-grid--pull-padded">
+                        <div class="slds-col--padded slds-size--1-of-1 slds-m-bottom--medium">                        
+                            <div class="slds-card slds-m-horizontal--small slds-p-around--small">
+                                <div class="slds-m-top--x-small">
+                                    <apex:outputPanel id="datesAttachmentsPanel">
+                                        <div class="slds-clearfix">
+                                            <div class="slds-m-top--xx-small slds-grid">
+                                                <div class="slds-size--8-of-12 slds-float--left slds-text-heading--small slds-m-top--xxx-small 
+                                                            slds-m-left--large slds-col" >                                    
+                                                    Show items created between 
+                                                    <apex:inputField style="width: 120px;text-align: center;font-size: 14px; height:30px;border: 1px solid #d8dde6;border-radius: .25rem;" styleClass="date form-control slds-m-left--small slds-m-right--small" id="startDateIdOpp"  value="{!startDateCV.LegacyNoteConvertedDate__c}" onchange=" resetFC();"/>and
+                                                    <apex:inputField style="width: 120px;text-align: center;font-size: 14px; height:30px;border: 1px solid #d8dde6;border-radius: .25rem;" styleClass="date form-control slds-m-left--small slds-m-right--small" id="endDateIdOpp"  value="{!endDateCV.LegacyNoteConvertedDate__c}" onchange=" resetFC();"/>
+                                                    <apex:actionfunction action="{!ResetFinishCount}" name="resetFC" rerender="checkCountId"/>
+                                                    
+                                                    
+                                                    <!--  <label class="slds-size_1-of-12 slds-text-heading--small slds-m-top--xx-small">Object</label> -->
+                                                    
+                                                    
+                                                </div>
+                                                <div class="slds-col slds-size_3-of-12 slds-m-top--small slds-m-right--large">
+                                                    <apex:outputPanel id="orderRadioPanel">
+                                                        <apex:selectRadio value="{!byCreateDateString}" id="optionOrderBy" style="font-size: 13px;">
+                                                            <apex:selectOptions value="{!orderByOptions}"/>
+                                                            <apex:actionSupport event="onchange" action="{!orderBy}" reRender="" />             
+                                                        </apex:selectRadio>
+                                                    </apex:outputPanel>
+                                                    
+                                                </div>
+                                                
+                                                <!--    <div class="slds-col slds-size--4-of-12 slds-m-top--xx-small" style="margin-right: 5px; display: inline;">
+Load items that are ready for conversion.
+</div> -->  
+                                                <div class="slds-col slds-size_2-of-12 slds-m-top--xxx-small slds-m-right--small slds-p-right--small">
+                                                    <div class="slds-float--right"> 
+                                                        <apex:commandButton styleClass="slds-button slds-button--neutral" style="width: 75px;"
+                                                                            action="{!loadInfo}"
+                                                                            oncomplete="setdatepicker();showHideInprogressLabelMigratedObject();showHideInprogressLabelUnmigratedObject()"
+                                                                            rerender="unmigratedAttachmentsdatePanel,migratedAttachmentsdatePanel,unmigratedAttachmentsPerObjectPanel,migratedAttachmentsPerObjectPanel,datesAttachmentsPanel, quantityAttachmentsPanel" id="infoButton"
+                                                                            disabled="{!disabledCount}" timeout="{!timeout}" status="actStatusId"
+                                                                            value="Filter"/>
+                                                        
+                                                    </div>
+                                                    
+                                                </div>
+                                            </div>
+                                            
+                                            
+                                            
+                                            
+                                            
+                                        </div>
+                                        
+                                        <div class="slds-m-left--large slds-p-left--small slds-m-top--xx-small slds-m-bottom--small">
+                                            <apex:outputText id="errorMessageId" style="color: red;" value="{!validationDateMessage}"></apex:outputText>
+                                        </div>
+                                        <div class="slds-grid">
+                                            <div class="slds-size_1-of-12"></div>
+                                            <div class="slds-size_3-of-12 slds-text-heading--small slds-grid">
+                                                <div class="slds-col slds-m-top--x-small">Filter by object:</div>
+                                                <div class="slds-col slds-size_6-of-12">
+                                                    
+                                                    <div class="slds-m-top--xxx-small slds-m-bottom--small" style="font-size: 12px;">
+                                                        <apex:outputPanel id="dropdownPanel">
+                                                            <div class="slds-select_container">
+                                                                <apex:selectList size="1" value="{!objectSelected}" styleClass="slds-select" >
+                                                                    <apex:selectOptions value="{!objectsItems}" />
+                                                                </apex:selectList>
+                                                            </div>
+                                                        </apex:outputPanel>
+                                                    </div>
+                                                    
+                                                </div>
+                                                
+                                            </div>
+                                        </div>
+                                        
+                                        
+                                    </apex:outputPanel>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="slds-col--padded slds-size--1-of-1 slds-m-bottom--medium">
+                            <div class="slds-card slds-m-horizontal--small slds-p-around--small">
+                                <div class="slds-grid">
+                                    <!-- LEFT PANEL -->
+                                    <div class="slds-col--padded slds-size--1-of-2">                        
+                                        <div class="slds-p-around--small">
+                                            <!-- START Action Count Status -->
+                                            <apex:outputpanel >
+                                                <apex:actionstatus id="actStatusId" onstop="verifyCountResult();">
+                                                    <apex:facet name="start">
+                                                        <div class="waitingSearchDiv" id="el_loading" style="background-color: #DCD6D6; height: 100%;opacity:0.65;width:100%;">
+                                                            <div class="waitingHolder slds-spinner slds-spinner_medium" role="status">
+                                                                <span class="slds-assistive-text">Loading</span>
+                                                                <div class="slds-spinner__dot-a"></div>
+                                                                <div class="slds-spinner__dot-b"></div>
+                                                            </div>
+                                                        </div>
+                                                    </apex:facet>
+                                                </apex:actionstatus>
+                                            </apex:outputpanel>
+                                            <!-- END Action Status -->
+                                            
+                                            <!-- START confirm by Id dialog -->
+                                            <div role="alertdialog" tabindex="-1" aria-labelledby="prompt-heading-id" 
+                                                 aria-describedby="prompt-message-wrapper" class="slds-modal slds-fade-in-open slds-modal--prompt slds-hide" id="promptMigrateById">
+                                                <div class="slds-modal__container">
+                                                    <div class="slds-modal__header slds-theme--success slds-theme--alert-texture">
+                                                        <h2 class="slds-text-heading--medium" id="prompt-heading-id">Convert Attachments by Id?</h2>                                        
+                                                    </div>
+                                                    <div class="slds-modal__content slds-p-around--medium">   
+                                                        <p>You're converting attachments to Salesforce Files.</p>
+                                                        <br/>
+                                                        <p>This takes some time depending on the number of attachments. You can keep working in Salesforce during conversion. When the conversion is complete, you get a confirmation email.</p>
+                                                    </div>
+                                                    <div class="slds-modal__footer slds-theme--default">
+                                                        <a href="#" class="slds-button slds-button--neutral  slds-m-right--small slds-m-bottom--x-small" onClick="closeMigrateModal()">Cancel</a>
+                                                        <a href="#" onClick="runMigrationRemote('byId')" onComplete="enableDisableMigrateButton()"                                           
+                                                           id="runMigrationButtonById" reRender="form, promptMigrateById"
+                                                           class="slds-button slds-button--neutral slds-m-right--small slds-m-bottom--x-small">Convert Attachments</a>
+                                                        
+                                                        
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="slds-backdrop slds-backdrop--close" id="modalMigrateById"></div>  
+                                            <!-- END confirm dialog -->
+                                            
+                                            <!-- START confirm by Object Id dialog -->
+                                            <div role="alertdialog" tabindex="-1" aria-labelledby="prompt-heading-id" 
+                                                 aria-describedby="prompt-message-wrapper" class="slds-modal slds-fade-in-open slds-modal--prompt slds-hide" id="promptMigrateByObjectId">
+                                                <div class="slds-modal__container">
+                                                    <div class="slds-modal__header slds-theme--success slds-theme--alert-texture">
+                                                        <h2 class="slds-text-heading--medium" id="prompt-heading-id">Convert Attachments by related record ID?</h2>                                        
+                                                    </div>
+                                                    <div class="slds-modal__content slds-p-around--medium">              
+                                                        <p>You're converting attachments to Salesforce Files.</p>
+                                                        <br/>
+                                                        <p>This takes some time depending on the number of attachments. You can keep working in Salesforce during conversion. When the conversion is complete, you get a confirmation email.</p>
+                                                        
+                                                    </div>
+                                                    <div class="slds-modal__footer slds-theme--default">
+                                                        <a href="#" class="slds-button slds-button--neutral  slds-m-right--small slds-m-bottom--x-small" onClick="closeMigrateModal()">Cancel</a>
+                                                        <a href="#" onClick="runMigrationRemote('byObjectId')" onComplete="enableDisableMigrateButton()"                                           
+                                                           id="runMigrationButtonByObjectId" reRender="unmigratedAttachmentsPerObjectPanel, promptMigrateByObjectId"
+                                                           class="slds-button slds-button--neutral slds-m-right--small slds-m-bottom--x-small">Convert Attachment</a>
+                                                        
+                                                        
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="slds-backdrop slds-backdrop--close" id="modalMigrateByObjectId"></div>  
+                                            <!-- END confirm dialog -->
+                                            
+                                            <!-- START confirm by Object dialog -->
+                                            <div role="alertdialog" tabindex="-1" aria-labelledby="prompt-heading-id" 
+                                                 aria-describedby="prompt-message-wrapper" class="slds-modal slds-fade-in-open slds-modal--prompt slds-hide" id="promptMigrateByObject">
+                                                <div class="slds-modal__container">
+                                                    <div class="slds-modal__header slds-theme--success slds-theme--alert-texture">
+                                                        <h2 class="slds-text-heading--medium" id="prompt-heading-id">Convert Attachments to Salesforce Files?</h2>                                        
+                                                    </div>
+                                                    <div class="slds-modal__content slds-p-around--medium">              
+                                                        <p>You’re converting <span id="totalSpan"></span> attachments to Salesforce Files.</p>
+                                                        <br/>
+                                                        <p>This takes some time depending on the number of attachments. You can keep working in Salesforce during conversion. When the conversion is complete, you get a confirmation email.</p>
+                                                        <apex:outputPanel id="messagesPopup">
+                                                            <div id="contentVersionMsg" 
+                                                                 class="slds-text-color--default"
+                                                                 style="display: none;">
+                                                                Note: Most orgs have a daily limit of 200,000 file versions.
+                                                            </div>
+                                                            
+                                                            <div id="contentVersionMsgScheduler" 
+                                                                 class="slds-text-color--default"
+                                                                 style="display: none;">
+                                                                <br/>
+                                                                Scheduler is Enabled. Scheduler size is {!schedulerSize} for each object, a total of <span id="schedulerTotal"></span> will be created for the day.
+                                                            </div>
+                                                        </apex:outputPanel>
+                                                    </div>
+                                                    <div class="slds-modal__footer slds-theme--default">
+                                                        <a href="#" class="slds-button slds-button--neutral  slds-m-right--small slds-m-bottom--x-small" onClick="closeMigrateModal()">Cancel</a>
+                                                        <a href="#" onClick="runMigrationRemote('byObject')" onComplete="enableDisableMigrateButton();"                                           
+                                                           id="runMigrationButtonByObject" reRender="promptMigrateByObject,datesAttachmentsPanel, messagesPopup"
+                                                           class="slds-button slds-button--neutral slds-m-right--small slds-m-bottom--x-small">Convert Attachment</a>
+                                                        
+                                                        
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="slds-backdrop slds-backdrop--close" id="modalMigrateByObject"></div>  
+                                            <!-- END confirm dialog -->
+                                            
+                                            <div>
+                                                <div class="slds-clearfix"> 
+                                                    <div class="slds-float--left slds-text-heading--small" style="width: 70%">                                    
+                                                        Public and Private Attachments to Convert
+                                                        <div class="mouseOverInfoOuter" id="searchInvoiceHelper" onfocus="addMouseOver(this)" onmouseover="addMouseOver(this)" tabindex="0">
+                                                            <img src="/s.gif" alt="" class="infoIcon" title="" />
+                                                            <div class="mouseOverInfo" id="searchInvoiceHelperText" style="display: none; opacity: -0.19999999999999996; left: 1px;">
+                                                                <div class="slds-popover__body" style="font-size:13px">
+                                                                    Use <strong>convert by attachment ID</strong> or <strong>convert by related record ID</strong> to test the conversion 
+                                                                    process on a small number of records.
+                                                                    When you are ready to convert your attachments in batches based on the parent object type, use <strong>bulk conversion 
+                                                                    by object type. </strong>
+                                                                    The total number of attachments to convert is at the bottom of 
+                                                                    the table. Daily file limits include notes and files created by other users. 
+                                                                    If you exceed the daily file limit, you can't create notes or files in 
+                                                                    your org until the next day. 
+                                                                    
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        
+                                                    </div>
+                                                    <div class="slds-float--right">
+                                                        <div>
+                                                            <button id="migrateButton" class="migrateButton slds-float--left slds-button slds-button--neutral  slds-m-right--small slds-m-bottom--x-small" 
+                                                                    type="button"
+                                                                    disabled = "true"
+                                                                    onclick="migrationPrompt()" >Convert</button>
+                                                            
+                                                            <!-- Warning bubble -->
+                                                            <div style="{!otherToolInProgress}" id="inProgress" >
+                                                                
+                                                                <div class="mouseOverInfoOuter" id="errorHelper" onfocus="addMouseOver(this)" 
+                                                                     onmouseover="addMouseOver(this)" tabindex="0">
+                                                                    
+                                                                    <span class="slds-icon_container slds-icon-standard-article"
+                                                                          style="padding: 5px; margin-top: 2px;">
+                                                                        <span class="slds-icon slds-icon-text-warning slds-icon_x-small" 
+                                                                              aria-hidden="true">
+                                                                            <img src="{!URLFOR($Asset.SLDS, 'assets/icons/utility/warning_60.png')}"  
+                                                                                 class="slds-icon_x-small"/>
+                                                                        </span>
+                                                                        
+                                                                    </span>
+                                                                    
+                                                                    
+                                                                    <div class="mouseOverInfo" id="errorHelperText" 
+                                                                         style="display: none; opacity: -0.19999999999999996; left: 1px;">
+                                                                        <div class="slds-popover__body" style="font-size:13px">
+                                                                            You're currently already converting Notes. When that process completes, you can convert notes.
+                                                                        </div>
+                                                                    </div>
+                                                                </div> 
+                                                            </div><!-- Warning bubble -->
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="slds-text-color_weak" style="width: 70%">
+                                                    <p>Convert your public and private attachments as a bulk process or individually.</p><br/>
+                                                    Test the conversion on a small number of records using <strong>Convert by related record ID</strong> or <strong>Convert by attachment ID</strong>.
+                                                    When you are ready to convert your attachments in batches based on the parent object type, use <strong>Bulk conversion 
+                                                    by object type. </strong><br/>
+                                                    <br/> <p>Daily limits for the number of documents and versions apply to attachments conversions. 
+                                                    If you exceed the daily limit, you can't create notes or files in your org until the next day. <a href="https://developer.salesforce.com/docs/atlas.en-us.salesforce_app_limits_cheatsheet.meta/salesforce_app_limits_cheatsheet/salesforce_app_limits_overview.htm" target = "_blank">See Salesforce Files Limits</a></p>
+                                                    <br/>
+                                                </div>
+                                                
+                                                
+                                                <apex:outputPanel id="migrationTypePanel" >
+                                                    <fieldset class="slds-form-element slds-m-top--small">
+                                                        <div class="slds-form-element__control slds-m-bottom--x-small slds-m-top--xxx-small 
+                                                                    slds-float--left">
+                                                            
+                                                            <label for="byObjectRadio">
+                                                                <input type="radio" disabled = "true" name="options" checked="true" onclick="byObjectShowPanel()" id="byObjectCheckbox"/>
+                                                                <span class="slds-radio--faux"></span>
+                                                                <span class="slds-form-element__label">
+                                                                    Bulk conversion by object type (recommended)
+                                                                </span>
+                                                            </label>
+                                                            
+                                                            <br/>
+                                                            <label for="byObjectIdRadio">
+                                                                <input disabled = "true" type="radio" name="options" onclick="byObjectIdShowPanel()" id="byObjectIdCheckbox"/>
+                                                                <span class="slds-radio--faux"></span>
+                                                                <span class="slds-form-element__label">
+                                                                    Convert by related record ID
+                                                                </span> <apex:outputLabel value="In progress" 
+                                                                                          id="byObjectIdInprogressLabel"
+                                                                                          styleClass="inProgressLabel slds-badge slds-truncate"
+                                                                                          style="display:none"/>
+                                                            </label>
+                                                            <p class="slds-form-element__label">To enter multiple IDs, enter each ID on a new line or separate the IDs with commas.</p>
+                                                            
+                                                            <br/>
+                                                            
+                                                            <label for="byIdRadio">
+                                                                <input type="radio" disabled = "true" name="options" onclick="byIdShowPanel()" id="byIdCheckbox"/>
+                                                                <span class="slds-radio--faux"></span>
+                                                                <span class="slds-form-element__label">
+                                                                    Convert by attachment ID
+                                                                </span> <apex:outputLabel value="In progress" 
+                                                                                          id="byIdInprogressLabel"
+                                                                                          styleClass="inProgressLabel slds-badge slds-truncate"
+                                                                                          style="display:none"/>
+                                                            </label>
+                                                            <p class="slds-form-element__label" style="width: 100%;">To enter multiple IDs, enter each ID on a new line or separate the IDs with commas.</p>
+                                                            
+                                                            <br/>
+                                                        </div>
+                                                    </fieldset>   
+                                                </apex:outputPanel>
+                                                <apex:outputPanel id="unmigratedAttachmentsdatePanel">
+                                                    <div class="slds-float--right slds-text-title slds-p-top--small slds-m-bottom--small">
+                                                        <!--Date&nbsp; --> <apex:outputText id="sDate" styleClass="slds-hide" value="{0, date,  yyyy - MM - dd }" >
+                                                        <apex:param value="{!startDate}"/> 
+                                                        </apex:outputText>
+                                                        <!--<apex:outputText id="sDate2" styleClass="slds-hide"  value="{0, date, yyyy - MM - dd}" >
+<apex:param value="{!startDate}"/> 
+</apex:outputText>  &nbsp;to&nbsp;  -->
+                                                        <apex:outputText id="eDate" value="{0, date,  yyyy - MM - dd }" styleClass="slds-hide">
+                                                            <apex:param value="{!endDate}"/> 
+                                                        </apex:outputText>
+                                                        <!-- <apex:outputText id="eDate2" styleClass="slds-hide" value="{0, date, yyyy - MM - dd}">
+<apex:param value="{!endDate}"/> 
+</apex:outputText>-->
+                                                        <c:formattedDate date_value_start="{!startDate}" date_value_end="{!endDate}"></c:formattedDate>
+                                                    </div>
+                                                    <br/>
+                                                </apex:outputPanel>
+                                                <apex:outputPanel id="byIdPanel" style="display: none;" >
+                                                    <apex:inputTextarea styleClass="slds-textarea"
+                                                                        id="byIdToMigrate" onkeyup="enableDisableMigrateButton()" disabled="{!inProgress}">
+                                                        
+                                                    </apex:inputTextarea>
+                                                    
+                                                </apex:outputPanel>
+                                                
+                                                <apex:outputPanel id="byObjectIdPanel" style="display: none;">
+                                                    <apex:inputTextarea styleClass="slds-textarea"
+                                                                        id="byObjectIdToMigrate" onkeyup="enableDisableMigrateButton()" disabled="{!inProgressId}">
+                                                        
+                                                    </apex:inputTextarea>
+                                                    
+                                                </apex:outputPanel>
+                                                
+                                            </div>
+                                            <apex:outputLabel value="In progress" 
+                                                              id="byIdsInprogressLabel"
+                                                              styleClass="inProgressLabel slds-badge slds-truncate"
+                                                              style="display:none"/>
+                                            <apex:outputPanel id="unmigratedAttachmentsPerObjectPanel">
+                                                <apex:inputHidden id="checkCountId" value="{!finishCount}"/>
+                                                <apex:dataTable value="{!unmigratedAttachmentsPerObject}"
+                                                                var="e"
+                                                                id="unmigratedAttachmentsPerObjectTable"
+                                                                headerClass="slds-text-title--caps"
+                                                                styleClass="slds-table slds-table--bordered slds-table--cell-buffer">
+                                                    
+                                                    <apex:column width="20">
+                                                        <apex:facet name="header">
+                                                            <apex:inputCheckbox onclick="selectUnselectAllUnimgratedObjects()" id="selectUnselectAllUnimgratedObjectsCheckbox">
+                                                                
+                                                            </apex:inputCheckbox>
+                                                        </apex:facet>
+                                                        <apex:inputCheckbox value="{!e.selected}"
+                                                                            onclick="enableDisableMigrateButton()"
+                                                                            id="objectCheckbox"
+                                                                            disabled="{! e.migrationInProgress }">
+                                                            
+                                                        </apex:inputCheckbox>
+                                                    </apex:column>
+                                                    
+                                                    <apex:column >
+                                                        <apex:facet name="header">OBJECT</apex:facet>
+                                                        <apex:outputText id="objectName" value="{!e.objectName}" />
+                                                    </apex:column>                               
+                                                    
+                                                    <apex:column >
+                                                        <apex:facet name="header">QUANTITY</apex:facet>
+                                                        <apex:outputText id="objectQuantity" value="{!e.quantityAttachments}" />                                       
+                                                    </apex:column>
+                                                    
+                                                    <apex:column >
+                                                        <apex:facet name="header">APPROX SIZE (MB)</apex:facet>
+                                                        {!e.totalMBSize}
+                                                    </apex:column>
+                                                    
+                                                    <apex:column width="50px">
+                                                        <apex:facet name="header">TO CONVERT</apex:facet> 
+                                                        <apex:outputText id="unmigratedObjectQuantity"
+                                                                         style="display:none" value="{!e.inputToMigrate}"/>
+                                                        <apex:inputText value="{!e.attachmentsToMigrate}"
+                                                                        id="attachmentsToMigrate"
+                                                                        onkeyup="calculateTotalAttachmentsToMigrate()"
+                                                                        onkeydown="if(event.keyCode==13){this.blur();calculateTotalAttachmentsToMigrate();}"
+                                                                        styleClass="attachmentsToMigrateInputs"
+                                                                        maxlength="10"
+                                                                        style="display: none;">
+                                                            
+                                                        </apex:inputText>
+                                                        
+                                                    </apex:column>
+                                                    <apex:column >
+                                                        <apex:facet name="header"></apex:facet>
+                                                        <apex:outputLabel value="In progress" 
+                                                                          id="unmigratedObjectInprogressLabel"
+                                                                          styleClass="inProgressLabel slds-badge slds-truncate"
+                                                                          style="display:none"/>
+                                                        
+                                                        <apex:inputHidden id="unmigratedObjectInprogressInputHidden" value="{!e.migrationInProgress }" />
+                                                        
+                                                    </apex:column>
+                                                    
+                                                </apex:dataTable>
+                                                
+                                                <apex:outputPanel rendered="{!EmptyUnmigratedObjects}">
+                                                    <apex:inputHidden id="noRecords" value="{!noRecords}"/>
+                                                    <div class="slds-panel slds-align--absolute-center slds-text-body--regular slds-p-top--large slds-p-bottom--large">
+                                                        No records
+                                                    </div>
+                                                    
+                                                </apex:outputPanel>
+                                                
+                                                
+                                                <div class="slds-float--right slds-text-color--default slds-m-right--x-small slds-m-top--small slds-text-align--right">
+                                                    <span  id="amountToMigrate">
+                                                        Total to convert: <span id="totalAttachmentsToMigrate">0</span>
+                                                    </span>
+                                                    <br/>
+                                                    
+                                                </div>
+                                                <div class="slds-align--absolute-center">
+                                                    
+                                                    
+                                                    <apex:commandButton value="Previous" action="{!PreviousUnmigratedObjects}"
+                                                                        oncomplete="refreshTextbox()"
+                                                                        rerender="unmigratedAttachmentsPerObjectPanel"
+                                                                        style="border-style: none; padding-left: 1rem; padding-right: 1rem;"
+                                                                        styleClass="slds-button"
+                                                                        disabled="{!DisablePreviousUnmigratedObjects}" />
+                                                    <apex:commandButton value="Next" action="{!NextUnmigratedObjects}"
+                                                                        style="border-style: none; padding-left: 1rem; padding-right: 1rem;"
+                                                                        styleClass="slds-button"
+                                                                        oncomplete="refreshTextbox()"
+                                                                        reRender="unmigratedAttachmentsPerObjectPanel"
+                                                                        disabled="{!DisableNextUnmigratedObjects}" />
+                                                    
+                                                </div>
+                                                <apex:inputHidden id="schedulerIsActive" value="{!schedulerIsActive}"/>
+                                                <apex:inputHidden id="schedulerSize" value="{!schedulerSize}"/>
+                                                
+                                            </apex:outputPanel>
+                                            
+                                            <div class="slds-clearfix">  
+                                                <div id="errorIdsMessage" class="slds-text-color_weak slds-m-top--large slds-m-bottom--small" style="word-break: break-all;"></div>
+                                                
+                                                <div class="slds-float--left slds-text-title slds-m-bottom--small">
+                                                    Your org is {!org.OrganizationType}. Check
+                                                    <a href="{!storageURL}"  target = "_blank">  
+                                                        storage usage</a>
+                                                    and monitor the status of 
+                                                    <a href="{!apexjobsURL}"  target = "_blank">  
+                                                        Apex jobs.
+                                                    </a>
+                                                    <p class="slds-m-top--large">
+                                                        Need help? Ask in our <a href="{!sucessComumunityGroupURL}"  target = "_blank">  Success Community Group.</a>
+                                                    </p>
+                                                    <p>
+                                                        Are you finding this tool useful? Let others know by writing a review on the <a href="{!appExchangeURL}"  target = "_blank">  AppExchange.</a>
+                                                    </p>
+                                                    
+                                                </div>
+                                                
+                                                
+                                                
+                                            </div>
+                                        </div>
+                                        
+                                    </div> <!-- END LEFT PANEL -->                   
+                                    <!-- RIGHT PANEL --> 
+                                    <div class="slds-col--padded slds-size--1-of-2" style="border-left: 2px solid #54698d;" id="rightPanel">
+                                        
+                                        <div class="slds-p-around--small">
+                                            
+                                            <!-- START confirm dialog -->
+                                            <div role="alertdialog" tabindex="-1" aria-labelledby="prompt-heading-id" 
+                                                 aria-describedby="prompt-message-wrapper" class="slds-modal slds-fade-in-open slds-modal--prompt slds-hide" id="promptState">
+                                                <div class="slds-modal__container">
+                                                    <div class="slds-modal__header slds-theme--error slds-theme--alert-texture">
+                                                        <h2 class="slds-text-heading--medium" id="prompt-heading-id">Delete converted attachments?</h2>                                        
+                                                    </div>
+                                                    <div class="slds-modal__content slds-p-around--medium">              
+                                                        <p>You’re deleting all converted attachments for <span id="objectName"></span>.</p>
+                                                    </div>
+                                                    <div class="slds-modal__footer slds-theme--default">
+                                                        <apex:inputHidden value="{!objectName}" id="objectToDelete"/>
+                                                        <a href="#" class="slds-button slds-button--neutral  slds-m-right--small slds-m-bottom--x-small" onClick="closeModal()">Cancel</a>
+                                                        <a href="#" onClick="deleteMigratedByObjectNameRemote()" 
+                                                           id="deleteButton"
+                                                           class="slds-button slds-button--neutral  slds-m-right--small slds-m-bottom--x-small">Delete</a> 
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="slds-backdrop slds-backdrop--close" id="modal"></div>  
+                                            <!-- END confirm dialog -->
+                                            
+                                            <div class="slds-text-heading--small">
+                                                Converted Public and Private Attachments
+                                                <div class="slds-float--right">
+                                                    <apex:commandButton value="Refresh"
+                                                                        action="{!refresh}"
+                                                                        oncomplete="refreshTextbox(),showHideInprogressLabelMigratedObject()"
+                                                                        id="migrateButtonRefrsh"
+                                                                        timeout="{!timeout}" status="actStatusId"
+                                                                        styleClass="slds-float--left slds-button slds-button--neutral slds-m-bottom--x-small"
+                                                                        reRender="unmigratedAttachmentsPerObjectPanel,migratedAttachmentsPerObjectPanel, byIdToMigrate, byObjectIdPanel, quantityAttachmentsPanel, checkCountId, dropdownPanel, contentVersionMsgScheduler" />
+                                                </div> 
+                                            </div> 
+                                            
+                                            <div class="slds-text-color_weak slds-m-top--small" style="width: 80%">
+                                                These attachments are now available in your org as Salesforce Files.  Delete these converted attachments to free up storage space. After you delete converted attachments, you can’t recover them.                                      
+                                            </div>
+                                            
+                                            <div class="slds-float--left slds-m-left--small slds-p-top--small">
+                                                <apex:actionStatus id="migratedAttachmentsPerObjectStatus"
+                                                                   styleClass="slds-float--left slds-m-right--small"
+                                                                   startText="Refresh in progress..."/>
+                                            </div>                                                
+                                            <apex:outputPanel id="migratedAttachmentsdatePanel">
+                                                <div class="slds-float--right slds-text-title slds-p-top--large">
+                                                    <c:formattedDate date_value_start="{!startDate}" date_value_end="{!endDate}"></c:formattedDate>
+                                                    
+                                                </div>
+                                            </apex:outputPanel>
+                                            
+                                            <apex:outputPanel id="quantityAttachmentsPanel" style="display: inline">
+                                                <dl class="slds-size--1-of-1 slds-dl_horizontal slds-m-top--small slds-m-bottom--medium">
+                                                    <dt class="slds-dl_horizontal__label slds-m-top--x-small" style="width: 50%;">Total attachments:</dt>
+                                                    <dd class="slds-dl_horizontal__detail slds-m-top--x-small" style="width: 15%;">
+                                                        <div id="converted" class="slds-text-color_default">
+                                                            {!totalAttachments}
+                                                        </div>
+                                                    </dd>
+                                                    <dt class="slds-dl_horizontal__label slds-m-top--x-small" style="width: 50%;">Converted attachments(can be deleted):</dt>
+                                                    <dd class="slds-dl_horizontal__detail slds-m-top--x-small" style="width: 30%;">
+                                                        <div id="converted" class="slds-text-color_default">
+                                                            <apex:outputText value="{!totalConvertedAttachments}" />
+                                                        </div>
+                                                    </dd>
+                                                    <dt class="slds-dl_horizontal__label slds-m-top--x-small" style="width: 50%;">Unconverted attachments:</dt>
+                                                    <dd class="slds-dl_horizontal__detail slds-m-top--x-small" style="width: 10%;">
+                                                        <div id="toConvert" class=" slds-text-color_default">
+                                                            <apex:outputText value="{!totalUnconvertedAttachments}" />
+                                                        </div>
+                                                    </dd>
+                                                </dl>     
+                                            </apex:outputPanel>
+                                            
+                                            <apex:outputPanel id="migratedAttachmentsPerObjectPanel">
+                                                
+                                                <apex:dataTable value="{!migratedAttachmentsPerObject}" var="e" id="migratedAttachmentsPerObjectTable"
+                                                                headerClass="slds-text-title--caps"
+                                                                styleClass="slds-table slds-table--bordered slds-table--cell-buffer">
+                                                    
+                                                    <apex:column >
+                                                        <apex:facet name="header">OBJECT</apex:facet>
+                                                        <apex:outputText id="objectName" value="{!e.objectName}" />
+                                                        
+                                                    </apex:column>
+                                                    
+                                                    <apex:column >
+                                                        <apex:facet name="header">QUANTITY</apex:facet>
+                                                        {!e.quantity}
+                                                    </apex:column>
+                                                    
+                                                    <apex:column >
+                                                        <apex:facet name="header">APPROX SIZE (MB)</apex:facet>
+                                                        {!e.totalMBSize}
+                                                    </apex:column>
+                                                    
+                                                    <apex:column >
+                                                        <apex:facet name="header"></apex:facet>
+                                                        <apex:outputLink value="#" onclick="deletePrompt('{!e.objectName}')" id="trash">
+                                                            <span class="slds-avatar slds-avatar--x-small">
+                                                                <img src="{!URLFOR($Resource.NMTicon, 'icon/delete.png')}" />
+                                                            </span>
+                                                        </apex:outputLink>
+                                                    </apex:column>
+                                                    
+                                                    <apex:column >
+                                                        <apex:facet name="header"></apex:facet>
+                                                        <apex:outputLabel value="In progress" 
+                                                                          id="migratedObjectInprogressLabel"
+                                                                          styleClass="inProgressLabelDelete slds-badge slds-truncate"
+                                                                          style="display:none"/>
+                                                        
+                                                        <apex:inputHidden id="migratedObjectInprogressInputHidden" value="{! e.migrationInProgress }" />
+                                                        
+                                                    </apex:column>
+                                                    
+                                                </apex:dataTable>
+                                                <apex:outputPanel rendered="{!EmptyMigratedObjects}">
+                                                    <div class="slds-panel slds-align--absolute-center slds-text-body--regular slds-p-top--large slds-p-bottom--large">
+                                                        No records
+                                                    </div>
+                                                    
+                                                </apex:outputPanel>
+                                                <div class="slds-align--absolute-center">
+                                                    
+                                                    <apex:commandButton value="Previous" action="{!PreviousMigratedObjects}"
+                                                                        rerender="migratedAttachmentsPerObjectPanel"
+                                                                        style="border-style: none; padding-left: 1rem; padding-right: 1rem;"
+                                                                        styleClass="slds-button"
+                                                                        disabled="{!DisablePreviousMigratedObjects}" />
+                                                    <apex:commandButton value="Next" action="{!NextMigratedObjects}"
+                                                                        style="border-style: none; padding-left: 1rem; padding-right: 1rem;"
+                                                                        styleClass="slds-button"
+                                                                        reRender="migratedAttachmentsPerObjectPanel"
+                                                                        disabled="{!DisableNextMigratedObjects}" />
+                                                    
+                                                </div>
+                                            </apex:outputPanel>
+                                        </div>
+                                        
+                                    </div><!-- END RIGHT PANEL --> 
+                                </div>
+                                <div class="slds-text-title slds-text-align_right">
+                                    Package Version {!version}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        
+                    </div>
+                    
+                </div>
+                
+            </apex:form>
+            
+        </div>
+    </html>
+</apex:page>
